@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Intake Form</title>
+</head>
+<body>
+  <h1>Client Intake Form</h1>
+  <form method="post">
+    <h2>Personal Information</h2>
+    <label>Full Name: <input name="fullName" required></label><br>
+    <label>Age: <input name="age" type="number" required></label><br>
+    <label>Gender: <input name="gender" required></label><br>
+    <label>Height: <input name="height" required></label><br>
+    <label>Weight: <input name="weight" required></label><br>
+    <label>Body Fat % or Lean Mass: <input name="bodyFat"></label><br>
+
+    <h2>Health Background</h2>
+    <label>Medical Conditions: <textarea name="medicalConditions"></textarea></label><br>
+    <label>Injuries: <textarea name="injuries"></textarea></label><br>
+    <label>Medications or Supplements: <textarea name="medications"></textarea></label><br>
+    <label>Allergies or Intolerances: <textarea name="allergies"></textarea></label><br>
+
+    <h2>Sport &amp; Training Details</h2>
+    <label>Sport/Discipline: <input name="sport"></label><br>
+    <label>Training Schedule: <textarea name="trainingSchedule"></textarea></label><br>
+    <label>Upcoming Competitions: <textarea name="competitions"></textarea></label><br>
+    <label>Performance Goals: <textarea name="performanceGoals"></textarea></label><br>
+
+    <h2>Lifestyle &amp; Habits</h2>
+    <label>Daily Activity: <input name="dailyActivity"></label><br>
+    <label>Sleep Hours per Night: <input name="sleepHours"></label><br>
+    <label>Stress Level: <input name="stressLevel"></label><br>
+    <label>Water Intake: <input name="waterIntake"></label><br>
+    <label>Travel or Routine Factors: <textarea name="travel"></textarea></label><br>
+
+    <h2>Nutrition &amp; Diet</h2>
+    <label>Current Eating Habits: <textarea name="eatingHabits"></textarea></label><br>
+    <label>Diet Preferences: <textarea name="dietPreferences"></textarea></label><br>
+    <label>Supplements Used: <textarea name="supplements"></textarea></label><br>
+    <label>Hydration During Training: <textarea name="hydration"></textarea></label><br>
+
+    <h2>Goals</h2>
+    <label>Main Goal:
+      <select name="mainGoal">
+        <option value="build muscle">Build muscle</option>
+        <option value="lose weight">Lose fat/weight</option>
+        <option value="improve performance">Improve performance</option>
+        <option value="improve recovery">Improve recovery &amp; energy</option>
+        <option value="other">Other</option>
+      </select>
+    </label><br>
+    <label>Target Weight/Body Composition: <input name="targetWeight"></label><br>
+    <label>Timeline: <input name="timeline"></label><br>
+
+    <h2>Tracking &amp; Feedback</h2>
+    <label>Past Testing: <textarea name="pastTesting"></textarea></label><br>
+    <label>Preferred Tracking Method: <textarea name="progressTracking"></textarea></label><br>
+
+    <button type="submit">Generate Plan</button>
+  </form>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Store</title>
+</head>
+<body>
+  <h1>Products</h1>
+  <ul>
+    <% products.forEach(function(p){ %>
+      <li>
+        <strong><%= p.name %></strong> - $<%= p.price %>
+        <form action="/purchase/<%= p.id %>" method="post">
+          <button type="submit">Buy</button>
+        </form>
+      </li>
+    <% }) %>
+  </ul>
+
+  <% if (session.hasPurchased) { %>
+    <p><a href="/plan">Access your free meal &amp; workout plan</a></p>
+  <% } %>
+
+  <h2>Our Brands</h2>
+  <ul>
+    <% brands.forEach(function(b){ %>
+      <li><%= b %></li>
+    <% }) %>
+  </ul>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "products": [
+    { "id": 1, "name": "Premium Access", "price": "19.99" }
+  ],
+  "brands": [
+    "Brand A",
+    "Brand B",
+    "Brand C"
+  ]
+}
