@@ -1,0 +1,16 @@
+{
+  "name": "dealflip",
+  "version": "1.0.0",
+  "description": "Deal finder and contract-assignment calculator with AI drafting",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "express": "^5.3.0"
+  },
+  "private": true
+}

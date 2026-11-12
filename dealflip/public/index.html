@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DealFlip</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">DealFlip <span class="sub">deal finder &amp; assignment calculator</span></div>
+    <nav>
+      <button class="tab active" data-view="deals">Deals</button>
+      <button class="tab" data-view="buyers">Cash buyers</button>
+    </nav>
+    <span id="ai-status" class="pill">AI: checking…</span>
+  </header>
+
+  <p class="disclaimer">
+    Educational tool. Listing values are estimates, the sample data is fictional, and nothing here is legal or financial advice.
+    Confirm comps, title, and your state's wholesaling rules with a local attorney or title company before signing anything.
+  </p>
+
+  <main id="view-deals" class="view">
+    <aside class="list-pane">
+      <div class="filters">
+        <select id="f-type">
+          <option value="">All sale types</option>
+          <option>Tax Deed</option><option>Tax Lien</option><option>Foreclosure</option>
+          <option>Probate</option><option>Off-market</option>
+        </select>
+        <select id="f-state"><option value="">All states</option></select>
+        <input id="f-max" type="number" placeholder="Max price" min="0" step="1000">
+      </div>
+      <button id="add-deal-btn" class="secondary full">+ Add a deal</button>
+      <ul id="deal-list" class="deal-list"></ul>
+    </aside>
+
+    <section id="detail" class="detail">
+      <p class="empty">Pick a deal on the left to run the numbers.</p>
+    </section>
+  </main>
+
+  <main id="view-buyers" class="view hidden">
+    <section class="buyers-pane">
+      <h2>Your cash buyers list</h2>
+      <p class="muted">Matching uses each buyer's buy box: where they buy, their price range, property types and rehab level. Add real buyers you've talked to; the samples are fictional.</p>
+      <div id="buyer-table"></div>
+      <h3>Add a buyer</h3>
+      <form id="buyer-form" class="grid-form">
+        <label>Name<input name="name" required></label>
+        <label>Contact<input name="contact" placeholder="email or phone"></label>
+        <label>States<input name="states" placeholder="OH, MI"></label>
+        <label>Counties<input name="counties" placeholder="Lake, Wayne"></label>
+        <label>Min price<input name="minPrice" type="number" min="0"></label>
+        <label>Max price<input name="maxPrice" type="number" min="0"></label>
+        <label>Property types<input name="propertyTypes" value="single-family"></label>
+        <label>Rehab levels<input name="rehabLevels" value="light, medium, heavy"></label>
+        <label class="check"><input name="proofOfFunds" type="checkbox"> Proof of funds on file</label>
+        <label class="wide">Notes<input name="notes"></label>
+        <button type="submit">Save buyer</button>
+      </form>
+    </section>
+  </main>
+
+  <dialog id="deal-dialog">
+    <form id="deal-form" method="dialog" class="grid-form">
+      <h3 class="wide">Add a deal</h3>
+      <label class="wide">Address<input name="address" required></label>
+      <label>City<input name="city"></label>
+      <label>County<input name="county"></label>
+      <label>State<input name="state" maxlength="2" placeholder="OH"></label>
+      <label>Sale type
+        <select name="saleType"><option>Tax Deed</option><option>Tax Lien</option><option>Foreclosure</option><option>Probate</option><option selected>Off-market</option></select>
+      </label>
+      <label>Property type<input name="propertyType" value="single-family"></label>
+      <label>Beds<input name="beds" type="number" step="1" min="0"></label>
+      <label>Baths<input name="baths" type="number" step="0.5" min="0"></label>
+      <label>Sqft<input name="sqft" type="number" min="0"></label>
+      <label>Year built<input name="yearBuilt" type="number"></label>
+      <label>Price / opening bid<input name="askingPrice" type="number" min="0" required></label>
+      <label>Estimated value (ARV)<input name="estimatedValue" type="number" min="0"></label>
+      <label>Estimated repairs<input name="estimatedRepairs" type="number" min="0"></label>
+      <label>Condition
+        <select name="condition"><option>light</option><option selected>medium</option><option>heavy</option></select>
+      </label>
+      <label>Title / liens / back taxes<input name="titleAndLiens" type="number" min="0"></label>
+      <label>Sale date<input name="saleDate" type="date"></label>
+      <label class="wide">Notes<input name="notes"></label>
+      <div class="wide row-end">
+        <button type="button" class="secondary" id="deal-cancel">Cancel</button>
+        <button type="submit">Save deal</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

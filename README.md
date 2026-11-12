@@ -23,3 +23,7 @@ This project is a minimal Node.js application demonstrating a product purchase f
 - After a mock purchase, users complete an intake form and receive an AI-generated plan.
 
 This app is for demonstration purposes only and does not process real payments.
+
+## DealFlip
+
+The `dealflip/` folder holds a separate app: a deal finder and contract-assignment calculator with AI drafting. See [dealflip/README.md](dealflip/README.md).
