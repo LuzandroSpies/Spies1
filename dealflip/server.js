@@ -5,6 +5,7 @@ const express = require('express');
 const store = require('./lib/store');
 const { analyzeDeal, matchBuyer } = require('./lib/calc');
 const ai = require('./lib/ai');
+const contracts = require('./lib/contracts');
 
 const app = express();
 app.use(express.json({ limit: '100kb' }));
@@ -143,6 +144,39 @@ app.post('/api/deals/:id/ai/outreach', async (req, res) => {
   const analysis = analysisFor(deal, req.body?.inputs);
   const price = Number(req.body?.price) || analysis.inputs.buyerPrice || analysis.buyerMaxPrice;
   res.json(await ai.draftOutreach(deal, buyer, price, analysis));
+});
+
+// Contract drafts are fixed templates filled from the deal, not AI-written.
+function contractTerms(deal, t = {}) {
+  return {
+    price: Number(t.price) || deal.askingPrice,
+    closingDays: Number(t.closingDays) || 30,
+    earnestMoney: Number(t.earnestMoney) || 0,
+    inspectionDays: Number(t.inspectionDays) || 10,
+    sellerCredits: Number(t.sellerCredits) || 0,
+    assigneeDeposit: Number(t.assigneeDeposit) || 0,
+    buyerName: String(t.buyerName || '').slice(0, 100),
+    sellerName: String(t.sellerName || '').slice(0, 100),
+    titleCompany: String(t.titleCompany || '').slice(0, 100),
+  };
+}
+
+app.post('/api/deals/:id/contracts/purchase', (req, res) => {
+  const deal = dealOr404(req, res);
+  if (deal) res.json({ text: contracts.purchaseAgreement(deal, contractTerms(deal, req.body?.terms)) });
+});
+
+app.post('/api/deals/:id/contracts/assignment', (req, res) => {
+  const deal = dealOr404(req, res);
+  if (!deal) return;
+  const buyer = store.get('buyers', req.body?.buyerId);
+  if (!buyer) return res.status(404).json({ error: 'Buyer not found' });
+  const a = analysisFor(deal, req.body?.inputs);
+  const text = contracts.assignmentAgreement(deal, contractTerms(deal, req.body?.terms), buyer, {
+    contractPrice: a.inputs.contractPrice,
+    buyerPrice: a.inputs.buyerPrice,
+  });
+  res.json({ text });
 });
 
 if (require.main === module) {

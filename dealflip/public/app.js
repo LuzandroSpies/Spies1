@@ -100,7 +100,11 @@ async function openDeal(id) {
     yourCosts: 500,
     earnestMoney: Math.min(1000, Math.round(deal.askingPrice * 0.05)),
   };
-  state.terms = { closingDays: 30, inspectionDays: 10, sellerCredits: 0, assignable: true, buyerName: '' };
+  const keep = state.terms || {};
+  state.terms = {
+    closingDays: 30, inspectionDays: 10, sellerCredits: 0, assignable: true, sellerName: '', assigneeDeposit: 1000,
+    buyerName: keep.buyerName || '', titleCompany: keep.titleCompany || '', // yours, so they carry over between deals
+  };
   renderDealList();
   renderDetail();
   await refresh();
@@ -150,13 +154,21 @@ function renderDetail() {
         ${slider('contractPrice', 'Your offer / contract price', Math.max(d.askingPrice * 3, 20000), 100)}
         <div class="two">
           ${numberField('closingDays', 'Close in (days)', 'terms')}
-          ${numberField('inspectionDays', 'Inspection period (days)', 'terms')}
+          ${numberField('inspectionDays', 'Free-look period (days)', 'terms')}
           ${numberField('earnestMoney', 'Earnest money')}
           ${numberField('sellerCredits', 'Seller credits', 'terms')}
         </div>
-        <label class="field"><span>Your name or company</span><input data-term="buyerName" placeholder="Shown as the buyer on the letter"></label>
+        <label class="field"><span>Your name or company</span><input id="t-buyerName" data-term="buyerName" placeholder="You, as buyer" value="${esc(state.terms.buyerName)}"></label>
+        <div class="two">
+          <label class="field"><span>Seller's name</span><input id="t-sellerName" data-term="sellerName" placeholder="Owner of record"></label>
+          <label class="field"><span>Title company</span><input id="t-titleCompany" data-term="titleCompany" placeholder="Holds deposits, runs closing" value="${esc(state.terms.titleCompany)}"></label>
+        </div>
         <label class="field" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-term="assignable" checked> Buyer is "name and/or assigns" (lets you assign the contract)</label>
-        <button id="draft-offer">Draft offer letter</button>
+        <p class="muted">During the free-look period you can cancel for any reason and get your earnest money back. After it, the most you can lose is the earnest money.</p>
+        <div class="row-start">
+          <button id="draft-offer">Draft offer letter</button>
+          <button id="draft-purchase" class="secondary">Purchase agreement</button>
+        </div>
         <div id="offer-out"></div>
       </div>
 
@@ -164,7 +176,10 @@ function renderDetail() {
         <h3><span class="num">3</span>Get cash buyers</h3>
         ${slider('buyerPrice', 'Price you ask your cash buyer', arvMax, 500)}
         <div class="muted" id="buyer-max-hint"></div>
-        ${numberField('yourCosts', 'Your marketing & closing costs')}
+        <div class="two">
+          ${numberField('yourCosts', 'Your marketing & closing costs')}
+          ${numberField('assigneeDeposit', "Investor's deposit", 'terms')}
+        </div>
         <div id="buyer-matches"></div>
         <div id="outreach-out"></div>
       </div>
@@ -179,6 +194,7 @@ function renderDetail() {
     </div>`;
 
   $('#draft-offer').addEventListener('click', draftOffer);
+  $('#draft-purchase').addEventListener('click', purchase);
   $('#ai-review').addEventListener('click', review);
   $('#delete-deal')?.addEventListener('click', deleteDeal);
 }
@@ -246,11 +262,15 @@ function renderMatches(matches) {
       (m) => `<div class="buyer-match">
         <div class="top-row"><b>${esc(m.buyer.name)}</b><span class="score">${m.score}/100</span></div>
         <div class="why">${esc(m.reasons.join(' · '))}</div>
-        <button class="secondary" data-outreach="${esc(m.buyer.id)}">Draft email</button>
+        <div class="row-start">
+          <button class="secondary" data-outreach="${esc(m.buyer.id)}">Draft email</button>
+          <button class="secondary" data-assign="${esc(m.buyer.id)}">Assignment agreement</button>
+        </div>
       </div>`,
     )
     .join('');
   box.querySelectorAll('[data-outreach]').forEach((b) => b.addEventListener('click', () => outreach(b.dataset.outreach, b)));
+  box.querySelectorAll('[data-assign]').forEach((b) => b.addEventListener('click', () => assignment(b.dataset.assign, b)));
 }
 
 async function runAi(button, target, path, body) {
@@ -259,7 +279,7 @@ async function runAi(button, target, path, body) {
   button.textContent = 'Working…';
   try {
     const r = await api(path, { method: 'POST', body });
-    const note = r.ai ? '' : `<span class="note">Template draft${r.note ? ` (${esc(r.note)})` : ''}</span>`;
+    const note = r.ai !== false ? '' : `<span class="note">Template draft${r.note ? ` (${esc(r.note)})` : ''}</span>`;
     target.innerHTML = `<div class="ai-out">${note}${esc(r.text)}</div><button class="secondary copy-btn">Copy</button>`;
     target.querySelector('.copy-btn').addEventListener('click', (e) => {
       navigator.clipboard?.writeText(r.text);
@@ -276,6 +296,22 @@ async function runAi(button, target, path, body) {
 function draftOffer(e) {
   const terms = { ...state.terms, price: state.inputs.contractPrice, earnestMoney: state.inputs.earnestMoney };
   runAi(e.target, $('#offer-out'), `/api/deals/${encodeURIComponent(state.deal.id)}/ai/offer`, { terms, inputs: state.inputs });
+}
+
+function contractTermsNow() {
+  return { ...state.terms, price: state.inputs.contractPrice, earnestMoney: state.inputs.earnestMoney };
+}
+
+function purchase(e) {
+  runAi(e.target, $('#offer-out'), `/api/deals/${encodeURIComponent(state.deal.id)}/contracts/purchase`, { terms: contractTermsNow() });
+}
+
+function assignment(buyerId, button) {
+  runAi(button, $('#outreach-out'), `/api/deals/${encodeURIComponent(state.deal.id)}/contracts/assignment`, {
+    buyerId,
+    terms: contractTermsNow(),
+    inputs: state.inputs,
+  });
 }
 
 function review(e) {

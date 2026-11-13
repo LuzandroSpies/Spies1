@@ -188,6 +188,7 @@ nav { display: flex; gap: 6px; }
   font-size: 14px;
 }
 .ai-out .note { color: var(--muted); font-size: 12px; display: block; margin-bottom: 6px; }
+.row-start { display: flex; flex-wrap: wrap; gap: 8px; }
 .row-end { display: flex; justify-content: flex-end; gap: 8px; }
 .copy-btn { margin-top: 6px; padding: 4px 10px; font-size: 13px; }
 

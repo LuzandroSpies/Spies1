@@ -53,3 +53,12 @@ test('adds, validates and deletes a deal', async () => {
 test('unknown deal returns 404', async () => {
   assert.strictEqual((await post('/api/deals/nope/analyze', {})).status, 404);
 });
+
+test('contract endpoints fill templates from the deal', async () => {
+  const p = await (await post('/api/deals/d3/contracts/purchase', { terms: { price: 90000, buyerName: 'Me LLC', inspectionDays: 7 } })).json();
+  assert.match(p.text, /\$90,000/);
+  assert.match(p.text, /Buyer has 7 days/);
+  const a = await (await post('/api/deals/d3/contracts/assignment', { buyerId: 'b2', terms: { buyerName: 'Me LLC' }, inputs: { contractPrice: 90000, buyerPrice: 95000 } })).json();
+  assert.match(a.text, /assignment fee of \$5,000/);
+  assert.strictEqual((await post('/api/deals/d3/contracts/assignment', { buyerId: 'nope' })).status, 404);
+});
