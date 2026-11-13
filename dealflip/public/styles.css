@@ -257,3 +257,13 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 @media (max-width: 600px) { .board { grid-template-columns: 1fr; } .goal-form input { width: 130px; } }
 .track-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 900px) { .track-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+#view-pipeline { gap: 16px; }
+.check-group { display: grid; gap: 6px; }
+.check-group h3 { margin: 6px 0 0; }
+.check-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: start; padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
+.check-item input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--good); }
+.check-item .title { font-weight: 600; }
+.check-item.done .title { color: var(--muted); text-decoration: line-through; }
+.check-item .hint { font-size: 13px; color: var(--muted); }
+.check-item .note { grid-column: 2; font-size: 13px; padding: 5px 8px; }

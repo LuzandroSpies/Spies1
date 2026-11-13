@@ -89,3 +89,12 @@ test('pipeline updates, goal settings and summary', async () => {
   assert.strictEqual(s.goal.amount, 40000);
   assert.strictEqual(s.columns.assigned[0].id, 'd3');
 });
+
+test('checklist endpoints save progress', async () => {
+  const put = (body) => fetch(`${base}/api/checklist`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const c = await (await put({ id: 'ein', done: true })).json();
+  assert.strictEqual(c.done, 1);
+  assert.strictEqual((await put({ id: 'bogus', done: true })).status, 400);
+  const again = await (await fetch(`${base}/api/checklist`)).json();
+  assert.strictEqual(again.done, 1);
+});

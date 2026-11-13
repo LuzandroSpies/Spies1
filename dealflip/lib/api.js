@@ -6,6 +6,7 @@ const { analyzeDeal, matchBuyer } = require('./calc');
 const contracts = require('./contracts');
 const pipeline = require('./pipeline');
 const { importCsv } = require('./importer');
+const checklist = require('./checklist');
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -190,6 +191,20 @@ function createApi({ store, ai, now = () => new Date() }) {
         const deadline = pipeline.daysBetween('2000-01-01', body.deadline) === null ? '' : body.deadline;
         store.setSettings({ ...store.getSettings(), goal: { amount, deadline } });
         return goal();
+      }
+
+      case 'GET checklist':
+        return checklist.withProgress(store.getSettings().checklist);
+      case 'PUT checklist': {
+        const settings = store.getSettings();
+        let next;
+        try {
+          next = checklist.updateItem(settings.checklist, body);
+        } catch (err) {
+          throw new HttpError(400, err.message);
+        }
+        store.setSettings({ ...settings, checklist: next });
+        return checklist.withProgress(next);
       }
 
       default:

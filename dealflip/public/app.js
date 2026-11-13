@@ -29,7 +29,7 @@ function showView(view) {
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   for (const v of ['deals', 'pipeline', 'buyers']) $(`#view-${v}`).classList.toggle('hidden', v !== view);
   if (view === 'buyers') loadBuyers();
-  if (view === 'pipeline') loadPipeline();
+  if (view === 'pipeline') { loadPipeline(); loadChecklist(); }
 }
 
 // ---------- AI status ----------
@@ -418,6 +418,32 @@ async function loadPipeline() {
     </div>`;
   }).join('');
 }
+
+async function loadChecklist() {
+  renderChecklist(await api('/api/checklist'));
+}
+
+function renderChecklist(c) {
+  $('#checklist-summary').textContent = `${c.done} of ${c.total} done`;
+  $('#checklist-bar').style.width = `${Math.round((c.done / c.total) * 100)}%`;
+  $('#checklist').innerHTML = c.groups.map((g) => `<div class="check-group"><h3>${esc(g.group)}</h3>
+    ${g.items.map((i) => `<div class="check-item ${i.done ? 'done' : ''}">
+      <input type="checkbox" id="chk-${esc(i.id)}" data-check="${esc(i.id)}" ${i.done ? 'checked' : ''}>
+      <label for="chk-${esc(i.id)}"><div class="title">${esc(i.title)}</div><div class="hint">${esc(i.hint)}</div></label>
+      <input class="note" id="note-${esc(i.id)}" data-note="${esc(i.id)}" value="${esc(i.note)}" placeholder="Notes (names, contacts, dates)" aria-label="Notes for ${esc(i.title)}">
+    </div>`).join('')}</div>`).join('');
+}
+
+$('#checklist').addEventListener('change', async (e) => {
+  const t = e.target;
+  const body = t.dataset.check ? { id: t.dataset.check, done: t.checked } : t.dataset.note ? { id: t.dataset.note, note: t.value } : null;
+  if (!body) return;
+  const c = await api('/api/checklist', { method: 'PUT', body });
+  if (body.done !== undefined) renderChecklist(c);
+  else {
+    $('#checklist-summary').textContent = `${c.done} of ${c.total} done · note saved`;
+  }
+});
 
 async function openFromPipeline(id) {
   showView('deals');
