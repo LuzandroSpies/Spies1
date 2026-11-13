@@ -44,3 +44,9 @@ test('buyer matching scores county, price, type and rehab', () => {
   assert.strictEqual(matchBuyer({ ...buyer, proofOfFunds: false }, deal, 30000).score, 90);
   assert.strictEqual(matchBuyer(buyer, deal, 90000).score, 70);
 });
+
+test('a buyer price exactly at the 70% max is not flagged (float rounding)', () => {
+  const a = analyzeDeal({ arv: 90000, contractPrice: 5000, buyerPrice: 45000, repairs: 18000 });
+  assert.strictEqual(a.buyerMaxPrice, 45000);
+  assert.strictEqual(a.verdict, 'works');
+});

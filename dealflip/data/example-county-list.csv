@@ -1,0 +1,6 @@
+Parcel Number,Owner Name,Property Address,City,State,Opening Bid,Market Value,Sale Date,Land Use,Bedrooms,Bathrooms,Living Area
+01-001-100,SAMPLE OWNER A,101 Example Blvd,Sampletown,OH,"$6,800","$88,000",12/08/2026,Single Family Residential,3,1,1240
+01-001-101,SAMPLE OWNER B,22 Placeholder Ave,Sampletown,OH,"$3,100","$41,000",12/08/2026,Single Family Residential,2,1,860
+01-001-102,SAMPLE OWNER C,7 Fictional Way,Sampletown,OH,"$58,000","$72,000",12/08/2026,Single Family Residential,3,1.5,1310
+01-001-103,SAMPLE OWNER D,450 Demo Rd,Sampletown,OH,"$2,400",,12/08/2026,Vacant Land,,,
+01-001-104,SAMPLE OWNER E,9 Mock St,Sampletown,OH,"$12,500","$115,000",12/08/2026,Two Family,4,2,1980

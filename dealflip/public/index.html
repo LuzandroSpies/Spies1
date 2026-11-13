@@ -11,6 +11,7 @@
     <div class="brand">DealFlip <span class="sub">deal finder &amp; assignment calculator</span></div>
     <nav>
       <button class="tab active" data-view="deals">Deals</button>
+      <button class="tab" data-view="pipeline">Pipeline</button>
       <button class="tab" data-view="buyers">Cash buyers</button>
     </nav>
     <span id="ai-status" class="pill">AI: checking…</span>
@@ -30,14 +31,41 @@
           <option>Probate</option><option>Off-market</option>
         </select>
         <select id="f-state"><option value="">All states</option></select>
-        <input id="f-max" type="number" placeholder="Max price" min="0" step="1000">
+        <select id="f-source" aria-label="List"><option value="">All lists</option></select>
+        <input id="f-max" type="number" placeholder="Max price" min="0" step="1000" aria-label="Max price">
+        <label class="check-row"><input id="f-works" type="checkbox"> Only deals that work</label>
       </div>
-      <button id="add-deal-btn" class="secondary full">+ Add a deal</button>
+      <div class="row-start">
+        <button id="import-btn" class="grow">Import a list</button>
+        <button id="add-deal-btn" class="secondary grow">+ Add a deal</button>
+      </div>
+      <div class="muted small" id="deal-count"></div>
       <ul id="deal-list" class="deal-list"></ul>
     </aside>
 
     <section id="detail" class="detail">
       <p class="empty">Pick a deal on the left to run the numbers.</p>
+    </section>
+  </main>
+
+  <main id="view-pipeline" class="view hidden">
+    <section class="pipeline-pane">
+      <div class="goal-head">
+        <div>
+          <h2>Goal</h2>
+          <div id="goal-summary" class="muted"></div>
+        </div>
+        <form id="goal-form" class="goal-form">
+          <label>Amount<input id="goal-amount" name="amount" type="number" min="0" step="1000"></label>
+          <label>By<input id="goal-deadline" name="deadline" type="date"></label>
+          <button type="submit" class="secondary">Save goal</button>
+        </form>
+      </div>
+      <div class="goal-bar" id="goal-bar" role="img" aria-label="Progress toward goal"></div>
+      <div class="goal-legend" id="goal-legend"></div>
+      <h3>Needs attention</h3>
+      <ul class="flags" id="alerts"></ul>
+      <div class="board" id="board"></div>
     </section>
   </main>
 
@@ -90,6 +118,29 @@
       <div class="wide row-end">
         <button type="button" class="secondary" id="deal-cancel">Cancel</button>
         <button type="submit">Save deal</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="import-dialog">
+    <form id="import-form" class="grid-form">
+      <h3 class="wide">Import a list</h3>
+      <p class="wide muted small">Upload a CSV from your county's tax-sale or tax-delinquent list, or an export from an investor tool. It needs at least an address column and a price, bid or amount-due column. A value column (market or assessed value) lets it score each deal; repairs are estimated as a share of that value until you check them.</p>
+      <label class="wide">CSV file<input id="import-file" type="file" accept=".csv,text/csv" required></label>
+      <label>List name<input id="import-source" name="source" placeholder="e.g. Lake County Dec tax sale" required></label>
+      <label>Sale type
+        <select id="import-saleType" name="saleType"><option>Tax Deed</option><option>Tax Lien</option><option>Foreclosure</option><option>Probate</option><option>Off-market</option></select>
+      </label>
+      <label>County (if not in file)<input id="import-county" name="county"></label>
+      <label>State (if not in file)<input id="import-state" name="state" maxlength="2"></label>
+      <label>City (if not in file)<input id="import-city" name="city"></label>
+      <label>Repair estimate, % of value
+        <select id="import-repairPct" name="repairPct"><option value="0.1">10% (light)</option><option value="0.2" selected>20% (medium)</option><option value="0.3">30% (heavy)</option><option value="0.4">40% (very heavy)</option></select>
+      </label>
+      <div class="wide" id="import-result"></div>
+      <div class="wide row-end">
+        <button type="button" class="secondary" id="import-cancel">Close</button>
+        <button type="submit" id="import-submit">Import</button>
       </div>
     </form>
   </dialog>

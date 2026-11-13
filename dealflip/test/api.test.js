@@ -62,3 +62,30 @@ test('contract endpoints fill templates from the deal', async () => {
   assert.match(a.text, /assignment fee of \$5,000/);
   assert.strictEqual((await post('/api/deals/d3/contracts/assignment', { buyerId: 'nope' })).status, 404);
 });
+
+const patch = (p, body) => fetch(base + p, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+test('import a CSV, then filter to deals that work', async () => {
+  const csv = 'Address,City,Opening Bid,Market Value\n9 Import Rd,Townville,5000,90000\n10 Import Rd,Townville,85000,90000\n11 Import Rd,Townville,2000,\n';
+  const r = await (await post('/api/deals/import', { csv, defaults: { saleType: 'Tax Deed', state: 'TX', county: 'Test', source: 'Test list', repairPct: 0.2 } })).json();
+  assert.strictEqual(r.added, 3);
+  assert.deepStrictEqual(r.counts, { works: 1, tight: 0, 'does-not-work': 1, 'needs-value': 1 });
+  const works = await (await fetch(`${base}/api/deals?source=Test%20list&verdict=works`)).json();
+  assert.deepStrictEqual(works.map((d) => d.address), ['9 Import Rd']);
+  const again = await (await post('/api/deals/import', { csv })).json();
+  assert.strictEqual(again.added, 0);
+  assert.strictEqual((await post('/api/deals/import', { csv: ' ' })).status, 400);
+});
+
+test('pipeline updates, goal settings and summary', async () => {
+  const bad = await patch('/api/deals/d3/pipeline', { stage: 'bogus' });
+  assert.strictEqual(bad.status, 400);
+  const d = await (await patch('/api/deals/d3/pipeline', { stage: 'assigned', contractPrice: 90000, buyerPrice: 98000, buyerId: 'b2', closingDate: '2099-01-01' })).json();
+  assert.strictEqual(d.pipeline.expectedFee, 8000);
+  const g = await (await fetch(`${base}/api/settings/goal`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: 40000, deadline: '2099-12-31' }) })).json();
+  assert.strictEqual(g.amount, 40000);
+  const s = await (await fetch(`${base}/api/pipeline`)).json();
+  assert.strictEqual(s.totals.assigned, 8000);
+  assert.strictEqual(s.goal.amount, 40000);
+  assert.strictEqual(s.columns.assigned[0].id, 'd3');
+});

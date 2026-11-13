@@ -48,7 +48,8 @@ function analyzeDeal(raw = {}) {
   const buyerCostPct = num(i.buyerCostPct, DEFAULTS.buyerCostPct);
 
   // Highest price an investor following the 70% rule would pay for this house.
-  const buyerMaxPrice = arv * maoPct - repairs - titleAndLiens;
+  // Rounded to whole dollars so float noise (0.7 * 90000 = 62999.999...) can't trip the flags below.
+  const buyerMaxPrice = Math.round(arv * maoPct - repairs - titleAndLiens);
 
   const assignmentFee = buyerPrice - contractPrice;
   const yourNet = assignmentFee - yourCosts;

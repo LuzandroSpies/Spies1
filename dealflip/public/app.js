@@ -21,11 +21,16 @@ const state = { deals: [], deal: null, inputs: {}, terms: {}, analysis: null };
 document.querySelectorAll('.tab').forEach((btn) =>
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b === btn));
-    $('#view-deals').classList.toggle('hidden', btn.dataset.view !== 'deals');
-    $('#view-buyers').classList.toggle('hidden', btn.dataset.view !== 'buyers');
-    if (btn.dataset.view === 'buyers') loadBuyers();
+    showView(btn.dataset.view);
   }),
 );
+
+function showView(view) {
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  for (const v of ['deals', 'pipeline', 'buyers']) $(`#view-${v}`).classList.toggle('hidden', v !== view);
+  if (view === 'buyers') loadBuyers();
+  if (view === 'pipeline') loadPipeline();
+}
 
 // ---------- AI status ----------
 api('/api/status').then((s) => {
@@ -41,33 +46,48 @@ async function loadDeals() {
   if ($('#f-type').value) params.set('saleType', $('#f-type').value);
   if ($('#f-state').value) params.set('state', $('#f-state').value);
   if ($('#f-max').value) params.set('maxPrice', $('#f-max').value);
-  state.deals = await api(`/api/deals?${params}`);
+  if ($('#f-source').value) params.set('source', $('#f-source').value);
+  if ($('#f-works').checked) params.set('verdict', 'works');
+  const deals = await api(`/api/deals?${params}`);
+  // Best opportunities first: deals that work, by the fee a 70%-rule buyer leaves you.
+  const rank = { works: 0, tight: 1, 'does-not-work': 2 };
+  state.deals = deals.sort((a, b) => (a.estimatedValue > 0 ? 0 : 1) - (b.estimatedValue > 0 ? 0 : 1)
+    || rank[a.quick.verdict] - rank[b.quick.verdict] || b.quick.realisticFee - a.quick.realisticFee);
   renderDealList();
 }
 
 async function fillStateFilter() {
   const all = await api('/api/deals');
-  const states = [...new Set(all.map((d) => d.state).filter(Boolean))].sort();
-  const sel = $('#f-state');
-  const current = sel.value;
-  sel.innerHTML = '<option value="">All states</option>' + states.map((s) => `<option>${esc(s)}</option>`).join('');
-  sel.value = current;
+  const fill = (sel, label, values) => {
+    const current = sel.value;
+    sel.innerHTML = `<option value="">${label}</option>` + values.map((v) => `<option>${esc(v)}</option>`).join('');
+    sel.value = values.includes(current) ? current : '';
+  };
+  fill($('#f-state'), 'All states', [...new Set(all.map((d) => d.state).filter(Boolean))].sort());
+  fill($('#f-source'), 'All lists', [...new Set(all.map((d) => d.source || 'Sample'))].sort());
 }
+
+const LIST_LIMIT = 200;
 
 function renderDealList() {
   const ul = $('#deal-list');
   if (!state.deals.length) {
     ul.innerHTML = '<li class="muted">No deals match these filters.</li>';
+    $('#deal-count').textContent = '';
     return;
   }
+  const n = state.deals.length;
+  $('#deal-count').textContent = n > LIST_LIMIT ? `Showing the top ${LIST_LIMIT} of ${n} deals. Use the filters to narrow it down.` : `${n} deal${n === 1 ? '' : 's'}`;
   ul.innerHTML = state.deals
+    .slice(0, LIST_LIMIT)
     .map((d) => {
       const tax = /tax/i.test(d.saleType);
       return `<li class="deal-item ${state.deal?.id === d.id ? 'active' : ''}" data-id="${esc(d.id)}">
         <div class="addr">${esc(d.address)}</div>
-        <div class="meta">${esc(d.city)}, ${esc(d.state)} · ${esc(d.beds)} bd / ${esc(d.baths)} ba · ${esc(d.sqft)} sqft</div>
+        <div class="meta">${esc([`${d.city || ''}${d.state ? `, ${d.state}` : ''}`, d.beds ? `${d.beds} bd / ${d.baths} ba` : '', d.sqft ? `${d.sqft} sqft` : ''].filter(Boolean).join(' · '))}</div>
         <div><span class="tag ${tax ? 'tax' : ''}">${esc(d.saleType)}</span>${d.sample ? '<span class="tag">Sample</span>' : ''}
-          <span class="tag verdict-${esc(d.quick.verdict)}">${verdictLabel(d.quick.verdict)}</span></div>
+          ${d.estimatedValue > 0 ? `<span class="tag verdict-${esc(d.quick.verdict)}">${verdictLabel(d.quick.verdict)}</span>` : '<span class="tag">Needs value</span>'}
+          ${d.pipeline?.stage ? `<span class="tag stage-tag">${esc(stageLabel(d.pipeline.stage))}</span>` : ''}</div>
         <div class="nums"><span>Price <b>${money(d.askingPrice)}</b></span><span>Est. value <b>${money(d.estimatedValue)}</b></span></div>
       </li>`;
     })
@@ -82,7 +102,7 @@ $('#deal-list').addEventListener('click', (e) => {
   const li = e.target.closest('.deal-item');
   if (li) openDeal(li.dataset.id);
 });
-['#f-type', '#f-state'].forEach((s) => $(s).addEventListener('change', loadDeals));
+['#f-type', '#f-state', '#f-source', '#f-works'].forEach((s) => $(s).addEventListener('change', loadDeals));
 $('#f-max').addEventListener('input', debounce(loadDeals, 300));
 
 // ---------- deal detail ----------
@@ -99,10 +119,12 @@ async function openDeal(id) {
     buyerPrice: Math.max(deal.askingPrice, first.buyerMaxPrice),
     yourCosts: 500,
     earnestMoney: Math.min(1000, Math.round(deal.askingPrice * 0.05)),
+    ...trackedInputs(deal),
   };
   const keep = state.terms || {};
   state.terms = {
-    closingDays: 30, inspectionDays: 10, sellerCredits: 0, assignable: true, sellerName: '', assigneeDeposit: 1000,
+    closingDays: 30, inspectionDays: deal.pipeline?.inspectionDays || 10, sellerCredits: 0, assignable: true,
+    sellerName: deal.ownerName || '', assigneeDeposit: 1000,
     buyerName: keep.buyerName || '', titleCompany: keep.titleCompany || '', // yours, so they carry over between deals
   };
   renderDealList();
@@ -139,6 +161,22 @@ function renderDetail() {
         <h3>What you'd actually make</h3>
         <div id="results"></div>
       </div>
+      <div class="card results" id="track-card">
+        <h3>Track this deal</h3>
+        <div class="track-grid">
+          <label class="field"><span>Stage</span><select id="p-stage">${STAGES.map((st) => `<option value="${st.id}">${st.label}</option>`).join('')}<option value="">Not tracked</option></select></label>
+          <label class="field"><span>Offer sent</span><input id="p-offerDate" type="date"></label>
+          <label class="field"><span>Contract signed</span><input id="p-contractDate" type="date"></label>
+          <label class="field"><span>Closing date</span><input id="p-closingDate" type="date"></label>
+          <label class="field"><span>Buyer who signed</span><select id="p-buyerId"><option value="">None yet</option></select></label>
+        </div>
+        <div class="row-start" style="align-items:center">
+          <button id="p-save">Save to pipeline</button>
+          <span class="muted small">Saves the contract price, buyer price, earnest money and free-look days you've set below.</span>
+          <span class="track-saved" id="p-saved"></span>
+        </div>
+      </div>
+
       <div class="card">
         <h3><span class="num">1</span>Check the numbers</h3>
         <p class="muted">The listing's "worth" figure is only an estimate. Replace it with sold comps.</p>
@@ -160,7 +198,7 @@ function renderDetail() {
         </div>
         <label class="field"><span>Your name or company</span><input id="t-buyerName" data-term="buyerName" placeholder="You, as buyer" value="${esc(state.terms.buyerName)}"></label>
         <div class="two">
-          <label class="field"><span>Seller's name</span><input id="t-sellerName" data-term="sellerName" placeholder="Owner of record"></label>
+          <label class="field"><span>Seller's name</span><input id="t-sellerName" data-term="sellerName" placeholder="Owner of record" value="${esc(state.terms.sellerName)}"></label>
           <label class="field"><span>Title company</span><input id="t-titleCompany" data-term="titleCompany" placeholder="Holds deposits, runs closing" value="${esc(state.terms.titleCompany)}"></label>
         </div>
         <label class="field" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-term="assignable" checked> Buyer is "name and/or assigns" (lets you assign the contract)</label>
@@ -195,6 +233,8 @@ function renderDetail() {
 
   $('#draft-offer').addEventListener('click', draftOffer);
   $('#draft-purchase').addEventListener('click', purchase);
+  $('#p-save').addEventListener('click', saveTracking);
+  fillTracking();
   $('#ai-review').addEventListener('click', review);
   $('#delete-deal')?.addEventListener('click', deleteDeal);
 }
@@ -297,6 +337,146 @@ function draftOffer(e) {
   const terms = { ...state.terms, price: state.inputs.contractPrice, earnestMoney: state.inputs.earnestMoney };
   runAi(e.target, $('#offer-out'), `/api/deals/${encodeURIComponent(state.deal.id)}/ai/offer`, { terms, inputs: state.inputs });
 }
+
+const STAGES = [
+  { id: 'lead', label: 'Lead' }, { id: 'offer', label: 'Offer sent' }, { id: 'contract', label: 'Under contract' },
+  { id: 'assigned', label: 'Buyer signed' }, { id: 'closed', label: 'Closed (paid)' }, { id: 'dead', label: 'Dead' },
+];
+const stageLabel = (id) => STAGES.find((s) => s.id === id)?.label || id;
+
+async function fillTracking() {
+  const d = state.deal;
+  const p = d.pipeline || {};
+  $('#p-stage').value = p.stage || '';
+  for (const k of ['offerDate', 'contractDate', 'closingDate']) $(`#p-${k}`).value = p[k] || '';
+  const buyers = await api('/api/buyers');
+  if (state.deal !== d) return;
+  $('#p-buyerId').innerHTML = '<option value="">None yet</option>' + buyers.map((b) => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('');
+  $('#p-buyerId').value = p.buyerId || '';
+}
+
+async function saveTracking() {
+  const stage = $('#p-stage').value;
+  const body = {
+    stage: stage || 'lead',
+    offerDate: $('#p-offerDate').value,
+    contractDate: $('#p-contractDate').value,
+    closingDate: $('#p-closingDate').value,
+    buyerId: $('#p-buyerId').value,
+    contractPrice: state.inputs.contractPrice,
+    buyerPrice: state.inputs.buyerPrice,
+    earnestMoney: state.inputs.earnestMoney,
+    inspectionDays: state.terms.inspectionDays,
+  };
+  try {
+    const updated = await api(`/api/deals/${encodeURIComponent(state.deal.id)}/pipeline`, { method: 'PATCH', body });
+    state.deal = { ...state.deal, pipeline: updated.pipeline };
+    const i = state.deals.findIndex((x) => x.id === updated.id);
+    if (i !== -1) state.deals[i] = { ...state.deals[i], pipeline: updated.pipeline };
+    renderDealList();
+    $('#p-stage').value = updated.pipeline.stage;
+    $('#p-saved').textContent = `Saved: ${stageLabel(updated.pipeline.stage)}, expected fee ${money(updated.pipeline.expectedFee)}`;
+  } catch (err) {
+    $('#p-saved').textContent = err.message;
+  }
+}
+
+// When a tracked deal is reopened, start from the numbers saved with it.
+function trackedInputs(deal) {
+  const p = deal.pipeline;
+  if (!p?.stage) return {};
+  const out = {};
+  for (const k of ['contractPrice', 'buyerPrice', 'earnestMoney']) if (p[k]) out[k] = p[k];
+  return out;
+}
+
+// ---------- pipeline view ----------
+async function loadPipeline() {
+  const s = await api('/api/pipeline');
+  const g = s.goal;
+  $('#goal-amount').value = g.amount;
+  $('#goal-deadline').value = g.deadline;
+  const lined = s.totals.closed + s.totals.assigned + s.totals.contract;
+  $('#goal-summary').textContent = `${money(lined)} of ${money(g.amount)} lined up` +
+    (g.deadline ? ` · ${g.daysLeft >= 0 ? `${g.daysLeft} days left` : `deadline passed ${-g.daysLeft} days ago`}` : '') +
+    (g.remaining > 0 ? ` · ${money(g.remaining)} still to find` : ' · goal covered if these deals close');
+  $('#goal-bar').innerHTML = `<span class="seg-closed" style="width:${g.closedPct}%"></span><span class="seg-assigned" style="width:${g.assignedPct}%"></span><span class="seg-contract" style="width:${g.contractPct}%"></span>`;
+  $('#goal-legend').innerHTML = [
+    ['seg-closed', 'Paid', s.totals.closed],
+    ['seg-assigned', 'Buyer signed (pending closing)', s.totals.assigned],
+    ['seg-contract', 'Under contract, no buyer yet', s.totals.contract],
+  ].map(([c, l, v]) => `<span><span class="dot ${c}"></span>${l}: <b>${money(v)}</b></span>`).join('');
+  $('#alerts').innerHTML = s.alerts.length
+    ? s.alerts.map((a) => `<li class="${a.level}" data-deal="${esc(a.dealId)}">${esc(a.text)}</li>`).join('')
+    : '<li class="info">Nothing urgent. Keep making offers.</li>';
+  $('#board').innerHTML = s.stages.map((st) => {
+    const cards = s.columns[st.id];
+    const sum = cards.reduce((t, c) => t + c.fee, 0);
+    return `<div class="column"><h4><span>${esc(st.label)} (${cards.length})</span>${sum && st.id !== 'dead' ? `<span>${money(sum)}</span>` : ''}</h4>
+      ${cards.map((c) => `<button class="pcard" data-deal="${esc(c.id)}"><b>${esc(c.address)}</b>${esc(c.city || '')}${c.state ? `, ${esc(c.state)}` : ''}
+        ${c.fee ? `<div class="fee">Fee ${money(c.fee)}</div>` : ''}${c.when ? `<div class="muted">${esc(c.when)}</div>` : ''}</button>`).join('') || '<span class="muted small">None</span>'}
+    </div>`;
+  }).join('');
+}
+
+async function openFromPipeline(id) {
+  showView('deals');
+  $('#f-type').value = $('#f-state').value = $('#f-source').value = $('#f-max').value = '';
+  $('#f-works').checked = false;
+  await loadDeals();
+  openDeal(id);
+}
+$('#board').addEventListener('click', (e) => { const b = e.target.closest('[data-deal]'); if (b) openFromPipeline(b.dataset.deal); });
+$('#alerts').addEventListener('click', (e) => { const b = e.target.closest('[data-deal]'); if (b) openFromPipeline(b.dataset.deal); });
+
+$('#goal-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await api('/api/settings/goal', { method: 'PUT', body: { amount: Number($('#goal-amount').value) || 0, deadline: $('#goal-deadline').value } });
+  loadPipeline();
+});
+
+// ---------- import ----------
+const importDialog = $('#import-dialog');
+$('#import-btn').addEventListener('click', () => { $('#import-result').innerHTML = ''; importDialog.showModal(); });
+$('#import-cancel').addEventListener('click', () => importDialog.close());
+$('#import-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const file = $('#import-file').files[0];
+  const out = $('#import-result');
+  if (!file) return;
+  if (file.size > 5_000_000) { out.innerHTML = '<div class="import-summary">That file is over 5 MB. Split it or filter it to your counties first.</div>'; return; }
+  const btn = $('#import-submit');
+  btn.disabled = true;
+  btn.textContent = 'Importing…';
+  try {
+    const csv = await file.text();
+    const fd = Object.fromEntries(new FormData(e.target));
+    const r = await api('/api/deals/import', { method: 'POST', body: { csv, defaults: { ...fd, state: (fd.state || '').toUpperCase(), repairPct: Number(fd.repairPct) } } });
+    const c = r.counts;
+    out.innerHTML = `<div class="import-summary">
+      <b>Added ${r.added} deal${r.added === 1 ? '' : 's'} to "${esc(r.source)}".</b>
+      <div>${c.works} work on paper · ${c.tight} tight · ${c['does-not-work']} don't work · ${c['needs-value']} need a value</div>
+      <div class="muted small">Columns used: ${esc(Object.entries(r.columns).map(([f, h]) => `${f} ← "${h}"`).join(', '))}</div>
+      ${r.skippedCount ? `<div>Skipped ${r.skippedCount} row${r.skippedCount === 1 ? '' : 's'}:</div><ul>${r.skipped.map((x) => `<li>Row ${x.row}: ${esc(x.reason)}</li>`).join('')}</ul>` : ''}
+      ${r.added ? '<button type="button" class="secondary" id="import-view">Show the deals that work</button>' : ''}
+    </div>`;
+    $('#import-view')?.addEventListener('click', async () => {
+      importDialog.close();
+      await fillStateFilter();
+      $('#f-source').value = r.source;
+      $('#f-works').checked = true;
+      $('#f-type').value = $('#f-state').value = $('#f-max').value = '';
+      await loadDeals();
+    });
+    await fillStateFilter();
+    await loadDeals();
+  } catch (err) {
+    out.innerHTML = `<div class="import-summary">${esc(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Import';
+  }
+});
 
 function contractTermsNow() {
   return { ...state.terms, price: state.inputs.contractPrice, earnestMoney: state.inputs.earnestMoney };
