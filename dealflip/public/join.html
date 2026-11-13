@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Get Deals First</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --panel: #fff; --text: #16181d; --muted: #5d6470; --border: #dfe3e8;
+      --accent: #1f6feb; --accent-text: #fff; --good: #1a7f37; --good-bg: #e6f4ea; --bad: #c62828;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0f1115; --panel: #171a21; --text: #e8eaee; --muted: #9aa3b0; --border: #2a2f3a;
+        --accent: #4c8dff; --good: #4cc26a; --good-bg: #13291b; --bad: #ff6b6b; color-scheme: dark; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; display: grid; gap: 16px; }
+    h1 { font-size: 26px; margin: 0; }
+    p { margin: 0; color: var(--muted); }
+    form { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: grid; gap: 14px; }
+    fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+    legend { font-weight: 600; margin-bottom: 6px; }
+    label { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chips label { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; color: var(--text); cursor: pointer; }
+    input, textarea { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; width: 100%; }
+    input[type="checkbox"] { width: auto; accent-color: var(--accent); }
+    input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    button { font: inherit; font-weight: 600; border: 0; background: var(--accent); color: var(--accent-text); padding: 12px 16px; border-radius: 8px; cursor: pointer; }
+    button:disabled { opacity: .6; }
+    .error { color: var(--bad); font-size: 14px; min-height: 1em; }
+    .done { background: var(--good-bg); color: var(--good); border-radius: 12px; padding: 18px; font-weight: 600; }
+    .fine { font-size: 13px; }
+    @media (max-width: 480px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Get off-market deals that fit your buy box</h1>
+    <p>Tell us where and what you buy. You'll only hear about properties that match, usually before they're offered anywhere else.</p>
+
+    <form id="join" novalidate>
+      <fieldset>
+        <legend>About you</legend>
+        <label>Name or company<input id="name" name="name" required autocomplete="organization"></label>
+        <div class="row">
+          <label>Email<input id="contact" name="contact" type="email" autocomplete="email"></label>
+          <label>Phone (optional)<input id="phone" name="phone" type="tel" autocomplete="tel"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Where you buy</legend>
+        <div class="row">
+          <label>States<input id="states" name="states" placeholder="e.g. OH, MI" required></label>
+          <label>Counties or cities<input id="counties" name="counties" placeholder="e.g. Lake, Cuyahoga"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>What you buy</legend>
+        <div class="row">
+          <label>Lowest price<input id="minPrice" name="minPrice" type="number" min="0" step="1000" placeholder="10000"></label>
+          <label>Highest price<input id="maxPrice" name="maxPrice" type="number" min="0" step="1000" placeholder="150000"></label>
+        </div>
+        <div class="chips" aria-label="Property types">
+          <label><input type="checkbox" name="propertyTypes" value="single-family" checked> Single-family</label>
+          <label><input type="checkbox" name="propertyTypes" value="duplex"> Duplex</label>
+          <label><input type="checkbox" name="propertyTypes" value="multi-family"> Small multi-family</label>
+          <label><input type="checkbox" name="propertyTypes" value="condo"> Condo</label>
+          <label><input type="checkbox" name="propertyTypes" value="land"> Land</label>
+        </div>
+        <div class="chips" aria-label="Rehab level">
+          <label><input type="checkbox" name="rehabLevels" value="light" checked> Light rehab</label>
+          <label><input type="checkbox" name="rehabLevels" value="medium" checked> Medium rehab</label>
+          <label><input type="checkbox" name="rehabLevels" value="heavy"> Heavy rehab</label>
+        </div>
+        <div class="chips" aria-label="Strategy">
+          <label><input type="checkbox" name="strategies" value="flip"> Fix and flip</label>
+          <label><input type="checkbox" name="strategies" value="rental"> Buy and hold / BRRRR</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>How you close</legend>
+        <div class="row">
+          <label>Days you need to close<input id="closeDays" name="closeDays" type="number" min="1" max="120" placeholder="14"></label>
+          <div class="chips" style="align-self:end"><label><input type="checkbox" id="proofOfFunds" name="proofOfFunds"> I can show proof of funds</label></div>
+        </div>
+        <label>Anything else (what you avoid, return you need)<textarea id="notes" name="notes" rows="3"></textarea></label>
+      </fieldset>
+
+      <div class="error" id="error" role="alert"></div>
+      <button type="submit" id="submit">Send my buy box</button>
+      <p class="fine">We'll only use this to send you matching deals. Reply "stop" any time to be removed.</p>
+    </form>
+
+    <div class="done" id="done" hidden>Thanks, you're on the list. We'll reach out when a property fits your buy box.</div>
+  </main>
+
+  <script>
+    'use strict';
+    const form = document.getElementById('join');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const list = (k) => fd.getAll(k);
+      const body = {
+        name: fd.get('name'), contact: fd.get('contact'), phone: fd.get('phone'),
+        states: String(fd.get('states') || '').split(',').map((s) => s.trim()).filter(Boolean),
+        counties: String(fd.get('counties') || '').split(',').map((s) => s.trim()).filter(Boolean),
+        minPrice: fd.get('minPrice'), maxPrice: fd.get('maxPrice'),
+        propertyTypes: list('propertyTypes'), rehabLevels: list('rehabLevels'), strategies: list('strategies'),
+        closeDays: fd.get('closeDays'), proofOfFunds: fd.has('proofOfFunds'), notes: fd.get('notes'),
+      };
+      const err = document.getElementById('error');
+      const btn = document.getElementById('submit');
+      err.textContent = '';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+        form.hidden = true;
+        document.getElementById('done').hidden = false;
+      } catch (ex) {
+        err.textContent = ex.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

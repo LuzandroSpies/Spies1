@@ -34,6 +34,8 @@ function showView(view) {
 
 // ---------- AI status ----------
 api('/api/status').then((s) => {
+  state.status = s;
+  $('#sources-note').textContent = s.autoPull ? 'DealFlip pulls each saved link once a day and adds new properties.' : 'Saved links are pulled automatically once the full app is online. In this preview, download the file and use the upload above.';
   const pill = $('#ai-status');
   pill.textContent = s.ai ? 'AI: Claude connected' : 'AI: templates (no API key)';
   pill.classList.toggle('on', s.ai);
@@ -127,6 +129,7 @@ async function openDeal(id) {
     sellerName: deal.ownerName || '', assigneeDeposit: 1000,
     buyerName: keep.buyerName || '', titleCompany: keep.titleCompany || '', // yours, so they carry over between deals
   };
+  state.rental = {};
   renderDealList();
   renderDetail();
   await refresh();
@@ -185,6 +188,9 @@ function renderDetail() {
           ${numberField('repairs', 'Repairs')}
           ${numberField('titleAndLiens', 'Title / liens / back taxes')}
         </div>
+        <button class="secondary" id="comps-btn" ${state.status?.comps ? '' : 'disabled'}>Check value &amp; rent</button>
+        <div class="muted small" id="comps-hint">${state.status?.comps ? 'Uses RentCast: an estimate plus nearby comparable properties.' : 'Value and rent checks switch on in the full app once it is online with a free RentCast key.'}</div>
+        <div id="comps-out">${d.comps ? renderComps(d.comps) : ''}</div>
       </div>
 
       <div class="card">
@@ -229,6 +235,19 @@ function renderDetail() {
         <div id="review-out"></div>
       </div>
 
+      <div class="card results">
+        <h3>Rental view (for buy-and-hold buyers)</h3>
+        <p class="muted">Many cash buyers keep houses as rentals instead of flipping. These are their numbers at the price you ask them, including a BRRRR refinance (buy, rehab, rent, refinance, repeat).</p>
+        <div class="rental-inputs">
+          <label class="field"><span>Monthly rent</span><input type="number" min="0" step="25" data-rent="rent" id="r-rent"></label>
+          <label class="field"><span>Property tax / year</span><input type="number" min="0" step="100" data-rent="taxesYearly" id="r-taxesYearly"></label>
+          <label class="field"><span>Insurance / year</span><input type="number" min="0" step="100" data-rent="insuranceYearly" id="r-insuranceYearly"></label>
+          <label class="field"><span>Refinance at (% of ARV)</span><input type="number" min="0" max="100" step="5" data-rent-pct="refiLtv" id="r-refiLtv" value="75"></label>
+          <label class="field"><span>Loan rate (%)</span><input type="number" min="0" max="20" step="0.125" data-rent-pct="refiRate" id="r-refiRate" value="7.5"></label>
+        </div>
+        <div id="rental-out"></div>
+      </div>
+
     </div>`;
 
   $('#draft-offer').addEventListener('click', draftOffer);
@@ -236,6 +255,7 @@ function renderDetail() {
   $('#p-save').addEventListener('click', saveTracking);
   fillTracking();
   $('#ai-review').addEventListener('click', review);
+  $('#comps-btn').addEventListener('click', checkComps);
   $('#delete-deal')?.addEventListener('click', deleteDeal);
 }
 
@@ -249,6 +269,11 @@ function onDetailInput(e) {
     const label = $(`#v-${t.dataset.key}`);
     if (label) label.textContent = money(t.value);
     debouncedRefresh();
+  } else if (t.dataset.rent || t.dataset.rentPct) {
+    const k = t.dataset.rent || t.dataset.rentPct;
+    if (t.value === '') delete state.rental[k];
+    else state.rental[k] = t.dataset.rentPct ? Number(t.value) / 100 : Number(t.value);
+    debouncedRefresh();
   } else if (t.dataset.term) {
     state.terms[t.dataset.term] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? Number(t.value) || 0 : t.value;
   }
@@ -258,15 +283,79 @@ async function refresh() {
   const d = state.deal;
   if (!d) return;
   const id = encodeURIComponent(d.id);
-  const [a, matches] = await Promise.all([
+  const [a, matches, rental] = await Promise.all([
     api(`/api/deals/${id}/analyze`, { method: 'POST', body: state.inputs }),
     api(`/api/deals/${id}/buyers`, { method: 'POST', body: { price: state.inputs.buyerPrice } }),
+    api(`/api/deals/${id}/rental`, { method: 'POST', body: { inputs: state.inputs, rental: state.rental } }),
   ]);
   if (state.deal !== d) return; // user switched deals mid-request
   state.analysis = a;
   renderResults(a);
   renderMatches(matches);
+  renderRental(rental);
 }
+
+function renderRental(r) {
+  // Show the numbers being used as placeholders, so the user sees what to override.
+  for (const k of ['rent', 'taxesYearly', 'insuranceYearly']) {
+    const el = $(`#r-${k}`);
+    if (el && el.value === '') el.placeholder = r.inputs[k];
+  }
+  const sign = (n) => (n < 0 ? 'neg' : n > 0 ? 'pos' : '');
+  $('#rental-out').innerHTML = `
+    <span class="tag verdict-${r.verdict}">${verdictLabel(r.verdict)} as a rental</span>
+    <span class="muted small">Rent from ${esc(r.rentSource)}</span>
+    <div class="stats">
+      ${stat('Buyer all-in (price + repairs + closing)', money(r.allIn))}
+      ${stat('Cash flow / month, no loan', money(r.cashFlowNoLoan), sign(r.cashFlowNoLoan))}
+      ${stat('Cap rate', `${r.capRate}%`)}
+      ${stat('Rent as % of all-in (1% rule)', `${r.onePercent}%`)}
+      ${stat('Refinance loan', money(r.refiLoan))}
+      ${stat('Cash left in after refinance', r.cashLeftIn <= 0 ? `$0 (+${money(-r.cashLeftIn)} back)` : money(r.cashLeftIn), r.cashLeftIn <= 0 ? 'pos' : '')}
+      ${stat('Cash flow / month after refinance', money(r.cashFlowAfterRefi), sign(r.cashFlowAfterRefi))}
+      ${stat('Cash-on-cash return', r.cashOnCash === null ? 'All cash back' : `${r.cashOnCash}%`)}
+    </div>
+    ${r.flags.length ? `<ul class="flags">${r.flags.map((f) => `<li class="${f.level}">${esc(f.text)}</li>`).join('')}</ul>` : ''}
+    <p class="muted small">Costs assumed: 8% vacancy, 8% maintenance, 10% property management, 5% big repairs, 3% purchase closing, 3% refinance costs, 30-year loan.</p>`;
+}
+
+function renderComps(c) {
+  const block = (title, x, unit) => (x ? `<div><b>${title}: ${money(x.estimate)}${unit}</b> <span class="muted">(range ${money(x.low)}–${money(x.high)}${unit})</span>
+      ${x.comps?.length ? `<ul class="comps">${x.comps.map((k) => `<li>${esc(k.address)}: ${money(k.price)}${unit}${k.beds ? ` · ${k.beds} bd` : ''}${k.sqft ? ` · ${k.sqft} sqft` : ''}${k.distanceMiles !== null ? ` · ${k.distanceMiles} mi` : ''}${k.date ? ` · ${esc(k.date)}` : ''}</li>`).join('')}</ul>` : ''}</div>` : `<div class="muted">${title}: no estimate found</div>`);
+  return `<div class="import-summary">
+    ${block('Value', c.value, '')}
+    ${c.value ? '<button class="secondary" id="use-value">Use this as ARV</button>' : ''}
+    ${block('Rent', c.rent, '/mo')}
+    <div class="muted small">From ${esc(c.source)} on ${esc(c.checkedAt)}. Comparables can include listings, not only sales. Value is the house as it is now, so the after-repair value may be higher.</div>
+  </div>`;
+}
+
+async function checkComps(e) {
+  const btn = e.target;
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  try {
+    const updated = await api(`/api/deals/${encodeURIComponent(state.deal.id)}/comps`, { method: 'POST' });
+    state.deal = { ...state.deal, comps: updated.comps, estimatedRent: updated.estimatedRent };
+    $('#comps-out').innerHTML = renderComps(updated.comps);
+    refresh();
+  } catch (err) {
+    $('#comps-out').innerHTML = `<div class="import-summary">${esc(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Check value & rent';
+  }
+}
+
+$('#detail').addEventListener('click', (e) => {
+  if (e.target.id !== 'use-value' || !state.deal?.comps?.value) return;
+  const v = state.deal.comps.value.estimate;
+  state.inputs.arv = v;
+  const slider = $('input[data-key=arv]');
+  if (slider) { slider.max = Math.max(Number(slider.max), v); slider.value = v; }
+  $('#v-arv').textContent = money(v);
+  refresh();
+});
 
 function stat(label, value, cls = '') {
   return `<div class="stat"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`;
@@ -565,15 +654,15 @@ $('#deal-form').addEventListener('submit', async (e) => {
 async function loadBuyers() {
   const buyers = await api('/api/buyers');
   $('#buyer-table').innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>Name</th><th>Where</th><th>Price range</th><th>Buys</th><th>POF</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Where</th><th>Price range</th><th>Buys</th><th>Closes</th><th></th></tr></thead>
     <tbody>${buyers
       .map(
         (b) => `<tr>
-          <td><b>${esc(b.name)}</b><div class="muted">${esc(b.contact)}</div></td>
+          <td><b>${esc(b.name)}</b>${b.signup ? ' <span class="tag stage-tag">Signed up</span>' : ''}<div class="muted">${esc([b.contact, b.phone].filter(Boolean).join(' · '))}</div></td>
           <td>${esc((b.states || []).join(', '))}<div class="muted">${esc((b.counties || []).join(', '))}</div></td>
           <td>${money(b.minPrice)}–${money(b.maxPrice)}</td>
-          <td>${esc((b.propertyTypes || []).join(', '))}<div class="muted">${esc((b.rehabLevels || []).join(', '))} rehab</div></td>
-          <td>${b.proofOfFunds ? 'Yes' : 'No'}</td>
+          <td>${esc((b.propertyTypes || []).join(', '))}<div class="muted">${esc((b.rehabLevels || []).join(', '))} rehab${b.strategies?.length ? ` · ${esc(b.strategies.map((x) => (x === 'rental' ? 'rentals' : 'flips')).join(', '))}` : ''}</div></td>
+          <td>${b.closeDays ? `${esc(b.closeDays)} days` : '—'}<div class="muted">${b.proofOfFunds ? 'Proof of funds' : 'No proof of funds'}</div></td>
           <td>${b.sample ? '<span class="tag">Sample</span>' : `<button class="secondary" data-del="${esc(b.id)}">Delete</button>`}</td>
         </tr>`,
       )
@@ -612,3 +701,85 @@ function debounce(fn, ms) {
 
 fillStateFilter();
 loadDeals();
+
+// ---------- investor sign-up ----------
+const SIGNUP_QUESTIONS = `Hi! I'm building a list of investors to send off-market deals to first. To make sure I only send what fits you:
+
+1. Which states and counties (or cities) do you buy in?
+2. What price range?
+3. Property types: single-family, duplex, small multi-family, condo, land?
+4. Rehab level you'll take on: light, medium or heavy?
+5. Do you flip, keep as rentals (buy and hold / BRRRR), or both?
+6. How many days do you need to close, and can you show proof of funds?
+7. Anything you avoid, or a minimum return you need?`;
+
+function setupSignup() {
+  const online = location.protocol.startsWith('http') && !location.hostname.endsWith('claude.ai') && !location.hostname.endsWith('claudeusercontent.com');
+  const link = `${location.origin}/join`;
+  $('#signup-link-row').hidden = !online;
+  if (online) $('#signup-link').textContent = link;
+  $('#signup-offline').hidden = online;
+  $('#signup-questions').textContent = SIGNUP_QUESTIONS;
+}
+
+async function copyText(text, btn, fallbackEl) {
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = 'Copied';
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(fallbackEl);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    btn.textContent = 'Selected, copy it now';
+  }
+}
+$('#copy-signup-link').addEventListener('click', (e) => copyText($('#signup-link').textContent, e.target, $('#signup-link')));
+$('#copy-questions').addEventListener('click', (e) => copyText(SIGNUP_QUESTIONS, e.target, $('#signup-questions')));
+setupSignup();
+
+// ---------- saved list links (automatic pulls) ----------
+async function loadSources() {
+  const list = await api('/api/sources');
+  $('#sources-list').innerHTML = list.length
+    ? list.map((src) => {
+        const r = src.lastResult;
+        const last = !src.lastRun ? 'Not pulled yet' : r?.ok ? `Last pull ${esc(src.lastRun.slice(0, 10))}: ${r.added} new` : `Last pull ${esc(src.lastRun.slice(0, 10))} failed: ${esc(r?.error || '')}`;
+        return `<div class="source-row"><div><b>${esc(src.name)}</b><div class="muted small">${esc(src.url)}</div><div class="small ${r && !r.ok ? 'bad-text' : 'muted'}">${last}</div></div>
+          <div class="row-start"><button class="secondary" data-pull="${esc(src.id)}">Pull now</button><button class="secondary" data-unsource="${esc(src.id)}">Remove</button></div></div>`;
+      }).join('')
+    : '<div class="muted small">No saved links yet.</div>';
+}
+$('#source-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = Object.fromEntries(new FormData(e.target));
+  try {
+    await api('/api/sources', { method: 'POST', body: { ...fd, repairPct: Number(fd.repairPct) } });
+    e.target.reset();
+    $('#source-error').textContent = '';
+    loadSources();
+  } catch (err) {
+    $('#source-error').textContent = err.message;
+  }
+});
+$('#sources-list').addEventListener('click', async (e) => {
+  const pull = e.target.dataset.pull;
+  const del = e.target.dataset.unsource;
+  if (!pull && !del) return;
+  e.target.disabled = true;
+  try {
+    if (pull) {
+      e.target.textContent = 'Pulling…';
+      await api(`/api/sources/${encodeURIComponent(pull)}/run`, { method: 'POST' });
+      await fillStateFilter();
+      await loadDeals();
+    } else {
+      await api(`/api/sources/${encodeURIComponent(del)}`, { method: 'DELETE' });
+    }
+  } catch (err) {
+    $('#source-error').textContent = err.message;
+  }
+  loadSources();
+});
+$('#import-btn').addEventListener('click', loadSources);

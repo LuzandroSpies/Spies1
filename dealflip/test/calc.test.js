@@ -50,3 +50,32 @@ test('a buyer price exactly at the 70% max is not flagged (float rounding)', () 
   assert.strictEqual(a.buyerMaxPrice, 45000);
   assert.strictEqual(a.verdict, 'works');
 });
+
+const { rentalAnalysis, monthlyPayment, estimateRent } = require('../lib/calc');
+
+test('mortgage payment matches the standard formula', () => {
+  assert.strictEqual(Math.round(monthlyPayment(100000, 0.06, 30)), 600); // 599.55
+  assert.strictEqual(monthlyPayment(0, 0.06, 30), 0);
+});
+
+test('rental view: BRRRR on a healthy deal', () => {
+  const r = rentalAnalysis({ arv: 168000, buyerPrice: 95000, repairs: 22000, rent: 1600, taxesYearly: 2400, insuranceYearly: 1200 });
+  assert.strictEqual(r.allIn, 119850); // 95000 + 22000 + 3% closing
+  assert.strictEqual(r.grossYearly, 19200);
+  assert.strictEqual(r.opexYearly, 9552); // 31% of gross + taxes + insurance
+  assert.strictEqual(r.noi, 9648);
+  assert.strictEqual(r.cashFlowAfterRefi, -77); // 75% refi payment eats the cash flow
+  assert.strictEqual(r.capRate, 8.1);
+  assert.strictEqual(r.refiLoan, 126000);
+  assert.ok(r.cashLeftIn < 0, 'refi returns all cash');
+  assert.strictEqual(r.cashOnCash, null);
+  assert.ok(r.flags.some((f) => /cash-out/.test(f.text)));
+});
+
+test('rental view flags negative cash flow and estimates rent when missing', () => {
+  const r = rentalAnalysis({ arv: 74000, buyerPrice: 50000, repairs: 18000 });
+  assert.strictEqual(r.rentIsEstimate, true);
+  assert.strictEqual(r.inputs.rent, estimateRent(74000));
+  assert.ok(r.cashFlowAfterRefi < 0);
+  assert.strictEqual(r.verdict, 'tight');
+});

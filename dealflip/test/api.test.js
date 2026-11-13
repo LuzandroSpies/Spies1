@@ -98,3 +98,9 @@ test('checklist endpoints save progress', async () => {
   const again = await (await fetch(`${base}/api/checklist`)).json();
   assert.strictEqual(again.done, 1);
 });
+
+test('sign-up page and API are public; everything else stays open only without a password', async () => {
+  const page = await fetch(`${base}/join`);
+  assert.strictEqual(page.status, 200);
+  assert.match(await page.text(), /buy box/);
+});

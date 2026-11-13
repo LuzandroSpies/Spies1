@@ -158,4 +158,99 @@ function matchBuyer(buyer, deal, askPrice) {
   return { score: Math.max(0, Math.min(100, score)), reasons };
 }
 
-module.exports = { analyzeDeal, matchBuyer, money, DEFAULTS };
+// ---------- Rental / BRRRR view, for buy-and-hold cash buyers ----------
+//
+// BRRRR = buy, rehab, rent, refinance, repeat. The buyer pays cash, fixes the
+// house, rents it out, then refinances at a share of the after-repair value
+// to pull their cash back out.
+
+const RENTAL_DEFAULTS = {
+  vacancyPct: 0.08,
+  maintenancePct: 0.08,
+  managementPct: 0.1,
+  capexPct: 0.05,
+  closingPct: 0.03, // buyer's purchase closing costs, share of price
+  refiLtv: 0.75,
+  refiRate: 0.075,
+  refiYears: 30,
+  refiCostPct: 0.03, // refinance closing costs, share of the new loan
+};
+
+// Rough starting rent when nothing better is known: 0.8% of ARV per month.
+function estimateRent(arv) {
+  return Math.round((num(arv) * 0.008) / 25) * 25;
+}
+
+function monthlyPayment(principal, annualRate, years) {
+  const n = years * 12;
+  const r = annualRate / 12;
+  if (principal <= 0 || n <= 0) return 0;
+  if (r === 0) return principal / n;
+  return (principal * r) / (1 - Math.pow(1 + r, -n));
+}
+
+function rentalAnalysis(raw = {}) {
+  const i = { ...RENTAL_DEFAULTS };
+  for (const k of Object.keys(raw)) if (raw[k] !== undefined && raw[k] !== '') i[k] = raw[k];
+
+  const arv = num(i.arv);
+  const price = num(i.buyerPrice);
+  const repairs = num(i.repairs) + num(i.titleAndLiens);
+  const rent = num(i.rent, estimateRent(arv));
+  const taxes = num(i.taxesYearly, arv * 0.015);
+  const insurance = num(i.insuranceYearly, arv * 0.006);
+  const pct = (k) => num(i[k], RENTAL_DEFAULTS[k]);
+
+  const allIn = price + repairs + price * pct('closingPct');
+  const grossYearly = rent * 12;
+  const opexYearly =
+    grossYearly * (pct('vacancyPct') + pct('maintenancePct') + pct('managementPct') + pct('capexPct')) + taxes + insurance;
+  const noi = grossYearly - opexYearly;
+
+  const loan = arv * pct('refiLtv');
+  const payment = monthlyPayment(loan, pct('refiRate'), num(i.refiYears, RENTAL_DEFAULTS.refiYears));
+  const refiCosts = loan * pct('refiCostPct');
+  const cashLeftIn = allIn + refiCosts - loan; // negative = buyer pulls out more than they put in
+  const cashFlowAfterRefi = noi / 12 - payment;
+
+  const flags = [];
+  if (arv <= 0) flags.push({ level: 'bad', text: 'Enter an after-repair value to run the rental numbers.' });
+  if (rent <= 0) flags.push({ level: 'bad', text: 'Enter a monthly rent.' });
+  if (arv > 0 && rent > 0 && cashFlowAfterRefi < 0) {
+    flags.push({ level: 'warn', text: `After refinancing, the rent falls about ${money(-cashFlowAfterRefi)} a month short of the costs and loan payment.` });
+  }
+  if (allIn > 0 && rent / allIn < 0.01) {
+    flags.push({ level: 'info', text: `Rent is ${(Math.round((rent / allIn) * 1000) / 10)}% of the all-in cost. Many rental buyers look for 1% or more.` });
+  }
+  if (cashLeftIn <= 0 && arv > 0) {
+    flags.push({ level: 'info', text: 'The refinance would return all of the buyer\'s cash. Lenders may cap a cash-out refinance at what was spent; check with one.' });
+  }
+
+  const rentalVerdict = flags.some((f) => f.level === 'bad')
+    ? 'does-not-work'
+    : cashFlowAfterRefi < 100 || (allIn > 0 && rent / allIn < 0.008)
+      ? 'tight'
+      : 'works';
+
+  const round = Math.round;
+  return {
+    inputs: { arv, buyerPrice: price, rent, taxesYearly: round(taxes), insuranceYearly: round(insurance) },
+    rentIsEstimate: raw.rent === undefined || raw.rent === '',
+    allIn: round(allIn),
+    grossYearly: round(grossYearly),
+    opexYearly: round(opexYearly),
+    noi: round(noi),
+    capRate: allIn > 0 ? Math.round((noi / allIn) * 1000) / 10 : 0,
+    cashFlowNoLoan: round(noi / 12),
+    onePercent: allIn > 0 ? Math.round((rent / allIn) * 1000) / 10 : 0,
+    refiLoan: round(loan),
+    refiPayment: round(payment),
+    cashLeftIn: round(cashLeftIn),
+    cashFlowAfterRefi: round(cashFlowAfterRefi),
+    cashOnCash: cashLeftIn > 0 ? Math.round(((cashFlowAfterRefi * 12) / cashLeftIn) * 1000) / 10 : null,
+    verdict: rentalVerdict,
+    flags,
+  };
+}
+
+module.exports = { analyzeDeal, matchBuyer, rentalAnalysis, estimateRent, monthlyPayment, money, DEFAULTS, RENTAL_DEFAULTS };

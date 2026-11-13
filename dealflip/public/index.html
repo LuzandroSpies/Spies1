@@ -81,6 +81,17 @@
 
   <main id="view-buyers" class="view hidden">
     <section class="buyers-pane">
+      <div class="signup-box">
+        <h2>Let investors sign themselves up</h2>
+        <div id="signup-link-row" class="row-start" hidden>
+          <span>Send investors this link: <b id="signup-link" class="mono"></b></span>
+          <button class="secondary" id="copy-signup-link" type="button">Copy link</button>
+        </div>
+        <p class="muted" id="signup-offline">The sign-up form goes live with the full app online, at <b>/join</b> on its address. Until then, paste these questions into WhatsApp or email and add the answers below.</p>
+        <pre class="questions" id="signup-questions"></pre>
+        <button class="secondary" id="copy-questions" type="button">Copy questions</button>
+      </div>
+
       <h2>Your cash buyers list</h2>
       <p class="muted">Matching uses each buyer's buy box: where they buy, their price range, property types and rehab level. Add real buyers you've talked to; the samples are fictional.</p>
       <div id="buyer-table"></div>
@@ -153,6 +164,25 @@
         <button type="submit" id="import-submit">Import</button>
       </div>
     </form>
+    <div class="sources">
+      <h3>Or pull a list automatically</h3>
+      <p class="muted small" id="sources-note"></p>
+      <form id="source-form" class="grid-form">
+        <label class="wide">Direct link to the CSV file<input id="source-url" name="url" type="url" placeholder="https://..." required></label>
+        <label>List name<input id="source-name" name="name" required></label>
+        <label>Sale type
+          <select id="source-saleType" name="saleType"><option>Tax Deed</option><option>Tax Lien</option><option>Foreclosure</option><option>Probate</option><option>Off-market</option></select>
+        </label>
+        <label>County<input id="source-county" name="county"></label>
+        <label>State<input id="source-state" name="state" maxlength="2"></label>
+        <label>Repair estimate
+          <select id="source-repairPct" name="repairPct"><option value="0.1">10%</option><option value="0.2" selected>20%</option><option value="0.3">30%</option><option value="0.4">40%</option></select>
+        </label>
+        <div class="row-end"><button type="submit" class="secondary">Save link</button></div>
+        <div class="wide form-error" id="source-error"></div>
+      </form>
+      <div id="sources-list"></div>
+    </div>
   </dialog>
 
   <script src="app.js"></script>

@@ -2,11 +2,12 @@
 
 // Every DealFlip API route in one place. The Express server and the in-browser
 // preview both call this, so they can't drift apart.
-const { analyzeDeal, matchBuyer } = require('./calc');
+const { analyzeDeal, matchBuyer, rentalAnalysis } = require('./calc');
 const contracts = require('./contracts');
 const pipeline = require('./pipeline');
 const { importCsv } = require('./importer');
 const checklist = require('./checklist');
+const { cleanSource } = require('./sources');
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -20,10 +21,12 @@ const DEAL_FIELDS = {
   beds: 'number', baths: 'number', sqft: 'number', yearBuilt: 'number', saleType: 'string', parcelId: 'string',
   ownerName: 'string', askingPrice: 'number', estimatedValue: 'number', estimatedRepairs: 'number',
   condition: 'string', titleAndLiens: 'number', notes: 'string', saleDate: 'string', source: 'string',
+  estimatedRent: 'number',
 };
 const BUYER_FIELDS = {
   name: 'string', contact: 'string', states: 'list', counties: 'list', minPrice: 'number',
   maxPrice: 'number', propertyTypes: 'list', rehabLevels: 'list', proofOfFunds: 'boolean', notes: 'string',
+  phone: 'string', strategies: 'list', closeDays: 'number',
 };
 
 // Keep only known fields and coerce their types, so stored records stay clean.
@@ -74,21 +77,90 @@ function withQuick(d) {
   return { ...d, quick: analysisFor(d) };
 }
 
-function createApi({ store, ai, now = () => new Date() }) {
+// What investors can send through the public sign-up form.
+const SIGNUP_FIELDS = {
+  name: 'string', contact: 'string', phone: 'string', states: 'list', counties: 'list', minPrice: 'number',
+  maxPrice: 'number', propertyTypes: 'list', rehabLevels: 'list', strategies: 'list', proofOfFunds: 'boolean',
+  closeDays: 'number', notes: 'string',
+};
+
+function rentalFor(deal, inputs = {}, rental = {}) {
+  const a = analysisFor(deal, inputs);
+  const r = rentalAnalysis({
+    arv: a.inputs.arv,
+    buyerPrice: a.inputs.buyerPrice,
+    repairs: a.inputs.repairs,
+    titleAndLiens: a.inputs.titleAndLiens,
+    rent: deal.estimatedRent || undefined,
+    ...rental,
+  });
+  const userRent = rental.rent !== undefined && rental.rent !== '';
+  r.rentSource = userRent
+    ? 'you'
+    : deal.estimatedRent && deal.comps?.rent?.estimate === deal.estimatedRent
+      ? 'RentCast'
+      : deal.estimatedRent
+        ? 'the deal'
+        : 'rough guess (0.8% of ARV)';
+  delete r.rentIsEstimate;
+  return r;
+}
+
+// deps.comps(deal) and deps.fetchCsv(url) are only provided by the server;
+// the in-browser preview can't call outside services.
+function createApi({ store, ai, now = () => new Date(), comps = null, fetchCsv = null }) {
   const today = () => pipeline.todayIso(now());
   const dealOr404 = (id) => store.get('deals', id) || (() => { throw new HttpError(404, 'Deal not found'); })();
   const buyerOr404 = (id) => store.get('buyers', id) || (() => { throw new HttpError(404, 'Buyer not found'); })();
   const goal = () => ({ ...DEFAULT_GOAL, ...(store.getSettings().goal || {}) });
 
+  let handleRunAll;
+
+  function importInto(csv, defaults) {
+    const result = importCsv(csv, defaults, store.list('deals'));
+    const added = store.addMany('deals', result.deals.map((d) => pick(d, DEAL_FIELDS)));
+    const counts = { works: 0, tight: 0, 'does-not-work': 0, 'needs-value': 0 };
+    for (const d of added) counts[d.estimatedValue > 0 ? analysisFor(d).verdict : 'needs-value']++;
+    return { added: added.length, counts, skipped: result.skipped.slice(0, 50), skippedCount: result.skipped.length, columns: result.columns, source: defaults.source || 'Import' };
+  }
+
+  async function runSource(sourceId) {
+    if (!fetchCsv) throw new HttpError(501, 'Automatic pulls run in the full app once it is online.');
+    const settings = store.getSettings();
+    const src = (settings.sources || []).find((x) => x.id === sourceId);
+    if (!src) throw new HttpError(404, 'List not found');
+    let lastResult;
+    try {
+      const csv = await fetchCsv(src.url);
+      const r = importInto(csv, { saleType: src.saleType, county: src.county, state: src.state, city: src.city, source: src.name, repairPct: src.repairPct });
+      lastResult = { ok: true, added: r.added, counts: r.counts, skippedCount: r.skippedCount };
+    } catch (err) {
+      lastResult = { ok: false, error: err.message };
+    }
+    const fresh = store.getSettings();
+    store.setSettings({
+      ...fresh,
+      sources: (fresh.sources || []).map((x) => (x.id === sourceId ? { ...x, lastRun: now().toISOString(), lastResult } : x)),
+    });
+    return { ...src, lastRun: now().toISOString(), lastResult };
+  }
+
+  // Pull every saved list; the server calls this once a day.
+  handleRunAll = async () => {
+    const out = [];
+    for (const src of store.getSettings().sources || []) out.push(await runSource(src.id).catch((e) => ({ id: src.id, lastResult: { ok: false, error: e.message } })));
+    return out;
+  };
+
   // handle('POST', '/api/deals/d1/analyze', body, query) -> JSON-able result
-  return async function handle(method, path, body = {}, query = {}) {
+  const handle = async function handle(method, path, body = {}, query = {}) {
     const p = path.replace(/^\/api\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
-    const route = `${method} ${p.map((seg, i) => (i === 1 && (p[0] === 'deals' || p[0] === 'buyers') && seg !== 'import' ? ':id' : seg)).join('/')}`;
+    const route = `${method} ${p.map((seg, i) => (i === 1 && ['deals', 'buyers', 'sources'].includes(p[0]) && seg !== 'import' ? ':id' : seg)).join('/')}`;
     const id = p[1];
 
     switch (route) {
       case 'GET status':
-        return { ai: ai.aiAvailable(), model: ai.MODEL, today: today() };
+        return { ai: ai.aiAvailable(), model: ai.MODEL, today: today(), comps: Boolean(comps), autoPull: Boolean(fetchCsv) };
 
       case 'GET deals': {
         let deals = store.list('deals');
@@ -111,11 +183,7 @@ function createApi({ store, ai, now = () => new Date() }) {
         if (csv.length > 5_000_000) throw new HttpError(413, 'File is too large (5 MB max)');
         const defaults = pick(body.defaults || {}, { saleType: 'string', county: 'string', state: 'string', city: 'string', source: 'string' });
         defaults.repairPct = Number(body.defaults?.repairPct ?? 0.2);
-        const result = importCsv(csv, defaults, store.list('deals'));
-        const added = store.addMany('deals', result.deals.map((d) => pick(d, DEAL_FIELDS)));
-        const counts = { works: 0, tight: 0, 'does-not-work': 0, 'needs-value': 0 };
-        for (const d of added) counts[d.estimatedValue > 0 ? analysisFor(d).verdict : 'needs-value']++;
-        return { added: added.length, counts, skipped: result.skipped.slice(0, 50), skippedCount: result.skipped.length, columns: result.columns, source: defaults.source || 'Import' };
+        return importInto(csv, defaults);
       }
       case 'GET deals/:id':
         return dealOr404(id);
@@ -134,6 +202,21 @@ function createApi({ store, ai, now = () => new Date() }) {
       }
       case 'POST deals/:id/analyze':
         return analysisFor(dealOr404(id), body);
+      case 'POST deals/:id/rental':
+        return rentalFor(dealOr404(id), body.inputs, body.rental);
+      case 'POST deals/:id/comps': {
+        const deal = dealOr404(id);
+        if (!comps) throw new HttpError(501, 'Value checks run in the full app once it is online with a RentCast key.');
+        let result;
+        try {
+          result = await comps(deal);
+        } catch (err) {
+          throw new HttpError(err.status || 502, err.message);
+        }
+        const patch = { comps: result };
+        if (result.rent?.estimate && !deal.estimatedRent) patch.estimatedRent = result.rent.estimate;
+        return store.update('deals', id, patch);
+      }
       case 'POST deals/:id/buyers': {
         const deal = dealOr404(id);
         const price = Number(body.price) || deal.askingPrice;
@@ -155,7 +238,9 @@ function createApi({ store, ai, now = () => new Date() }) {
         const deal = dealOr404(id);
         const buyer = buyerOr404(body.buyerId);
         const a = analysisFor(deal, body.inputs);
-        return ai.draftOutreach(deal, buyer, Number(body.price) || a.inputs.buyerPrice || a.buyerMaxPrice, a);
+        const price = Number(body.price) || a.inputs.buyerPrice || a.buyerMaxPrice;
+        const rental = buyer.strategies?.includes('rental') ? rentalFor(deal, { ...body.inputs, buyerPrice: price }, body.rental) : null;
+        return ai.draftOutreach(deal, buyer, price, a, rental);
       }
       // Contract drafts are fixed templates filled from the deal, not AI-written.
       case 'POST deals/:id/contracts/purchase': {
@@ -173,6 +258,38 @@ function createApi({ store, ai, now = () => new Date() }) {
           }),
         };
       }
+
+      case 'POST join': {
+        const b = pick(body, SIGNUP_FIELDS);
+        if (!b.name || !(b.contact || b.phone)) throw new HttpError(400, 'Please add your name and an email or phone number.');
+        if (!b.states?.length) throw new HttpError(400, 'Please add at least one state you buy in.');
+        const signups = store.list('buyers').filter((x) => x.signup);
+        if (signups.length >= 500) throw new HttpError(429, 'Sign-ups are closed for now.');
+        store.add('buyers', { ...b, states: b.states.map((x) => x.toUpperCase()), signup: true, signedUpAt: today() });
+        return { ok: true };
+      }
+
+      case 'GET sources':
+        return store.getSettings().sources || [];
+      case 'POST sources': {
+        let src;
+        try {
+          src = cleanSource(body);
+        } catch (err) {
+          throw new HttpError(400, err.message);
+        }
+        const settings = store.getSettings();
+        store.setSettings({ ...settings, sources: [...(settings.sources || []), src] });
+        return src;
+      }
+      case 'DELETE sources/:id': {
+        const settings = store.getSettings();
+        const sources = (settings.sources || []).filter((x) => x.id !== id);
+        store.setSettings({ ...settings, sources });
+        return { deleted: sources.length !== (settings.sources || []).length };
+      }
+      case 'POST sources/:id/run':
+        return runSource(id);
 
       case 'GET buyers':
         return store.list('buyers');
@@ -211,6 +328,8 @@ function createApi({ store, ai, now = () => new Date() }) {
         throw new HttpError(404, 'Not found');
     }
   };
+  handle.runAllSources = () => handleRunAll();
+  return handle;
 }
 
 module.exports = { createApi, HttpError };

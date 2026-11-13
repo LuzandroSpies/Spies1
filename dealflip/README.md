@@ -16,7 +16,11 @@ Inspired by "AI house flipping" videos, but built to show the real numbers, not 
    These are starting drafts for a local real estate attorney to review, not finished legal documents.
 7. **Pipeline.** Track each deal from lead to offer, contract, buyer signed and closed. The Pipeline tab shows progress toward your goal (paid, pending closing, under contract) and alerts you before a free-look period ends with no buyer, when a closing date is near or past, and when an offer needs a follow-up.
 8. **Setup checklist.** On the Pipeline tab: the steps to do deals from outside the US (ownership, tax adviser, LLC, operating agreement, EIN, bank account, title company, attorney review, state rules, notarization) and your first offers. Each step has a note field for names, contacts and dates.
-9. **AI deal review.** Claude reviews the deal, ranks the risks for that sale type and gives a due-diligence checklist.
+9. **Rental view.** For buy-and-hold buyers: all-in cost, cash flow, cap rate, the 1% rule, and a BRRRR refinance (cash left in, cash flow after the loan, cash-on-cash return). Deal emails to rental buyers include these numbers.
+10. **Value and rent check.** With a RentCast API key, one click gets a value and rent estimate with nearby comparables for the deal.
+11. **Investor sign-up.** A public form at `/join` where investors enter their own buy box; they land on your Cash buyers list. There's also a "Copy questions" button for WhatsApp or email.
+12. **Saved list links.** Save the direct link to a county CSV and DealFlip pulls it once a day, adding only new properties.
+13. **AI deal review.** Claude reviews the deal, ranks the risks for that sale type and gives a due-diligence checklist.
 
 The first sample deal uses the numbers from the video ($11,559 price, $74,000 value, $50,000 buyer price). The headline $38,441 fee is correct arithmetic. But once you add $18k of repairs and $3.5k of title costs, a 70%-rule investor would pay about $30,300, and at $50,000 the end buyer loses about $6,400.
 
@@ -33,10 +37,13 @@ AI features use Claude (`claude-opus-5-5`). Set `ANTHROPIC_API_KEY` (or log in w
 If Claude declines a request on a safety classifier, the API retries on a fallback model (`fallbacks: "default"`).
 Without credentials, the app still works and uses plain templates for every draft.
 
-Optional environment variables:
+Environment variables:
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `DEALFLIP_PASSWORD` | none | **Set this before putting the app online.** Protects everything except the investor sign-up form (any username, this password). |
+| `RENTCAST_API_KEY` | none | Turns on value and rent checks (rentcast.io has a free starter plan) |
+| `ANTHROPIC_API_KEY` | none | Turns on Claude for reviews, offers and emails |
 | `PORT` | `3100` | Server port |
 | `DEALFLIP_MODEL` | `claude-opus-5-5` | Claude model |
 | `DEALFLIP_STORE` | `data/store.json` | Where added deals and buyers are saved |

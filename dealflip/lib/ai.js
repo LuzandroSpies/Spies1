@@ -117,20 +117,20 @@ Under 300 words.`;
   }
 }
 
-async function draftOutreach(deal, buyer, price, analysis) {
+async function draftOutreach(deal, buyer, price, analysis, rental = null) {
   const prompt = `${describeDeal(deal, analysis)}
 
 Cash buyer: ${buyer.name}. Buy box: ${buyer.states.join(', ')} (${(buyer.counties || []).join(', ')}),
 ${money(buyer.minPrice)}-${money(buyer.maxPrice)}, ${buyer.propertyTypes.join('/')}, ${buyer.rehabLevels.join('/')} rehab.
 
-Write a short email to this buyer offering the deal at ${money(price)}. Include a subject line.
+${rental ? `This buyer keeps rentals. Rental estimate at that price: rent ${money(rental.inputs.rent)}/mo (from ${rental.rentSource}), cap rate ${rental.capRate}%, cash flow with no loan ${money(rental.cashFlowNoLoan)}/mo, after refinancing ${money(rental.cashFlowAfterRefi)}/mo. Mention these as estimates.\n` : ''}Write a short email to this buyer offering the deal at ${money(price)}. Include a subject line.
 Be honest: say the user holds a purchase contract (not the deed), that the price is for an
 assignment of contract, state the ARV and repair numbers as estimates, and invite them to verify.
 Under 180 words.`;
   try {
     return { ai: true, text: await ask(prompt, { effort: 'low' }) };
   } catch (err) {
-    return { ai: false, note: friendly(err), text: fallbackOutreach(deal, buyer, price, analysis) };
+    return { ai: false, note: friendly(err), text: fallbackOutreach(deal, buyer, price, analysis, rental) };
   }
 }
 
@@ -198,7 +198,7 @@ function fallbackOffer(deal, t) {
     .trim();
 }
 
-function fallbackOutreach(deal, buyer, price, a) {
+function fallbackOutreach(deal, buyer, price, a, rental = null) {
   return [
     `Subject: ${deal.city}, ${deal.state} ${deal.propertyType} under contract - ${money(price)}`,
     '',
@@ -209,6 +209,9 @@ function fallbackOutreach(deal, buyer, price, a) {
     `- Estimated ARV: ${money(a.inputs.arv)} (please verify with your own comps)`,
     `- Estimated repairs: ${money(a.inputs.repairs)} (${deal.condition} rehab)`,
     `- Sale type: ${deal.saleType}`,
+    ...(rental
+      ? [`- As a rental: about ${money(rental.inputs.rent)}/mo rent, ${rental.capRate}% cap rate, ${money(rental.cashFlowNoLoan)}/mo cash flow before any loan (estimates)`]
+      : []),
     '',
     'Happy to share photos and the contract. Let me know if you want to walk it.',
     '',
