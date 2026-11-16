@@ -218,6 +218,34 @@ function createApi({ store, ai, now = () => new Date(), comps = null, fetchCsv =
       }
       case 'POST deals/:id/analyze':
         return analysisFor(dealOr404(id), body);
+      // Quick calculator: numbers only, no deal needed.
+      case 'POST calc/cash': {
+        const a = analyzeDeal({
+          arv: body.arv,
+          repairs: body.repairs,
+          titleAndLiens: body.titleAndLiens,
+          contractPrice: body.askingPrice || 0,
+          buyerPrice: 0,
+        });
+        const fee = Math.max(0, Number(body.fee) || 0);
+        const askingPrice = Number(body.askingPrice) || 0;
+        return {
+          investorMax: a.buyerMaxPrice,
+          maxOffer: a.buyerMaxPrice - fee,
+          feeAtAsking: askingPrice ? a.buyerMaxPrice - askingPrice : null,
+          askingPrice,
+          fee,
+          hasValue: Number(body.arv) > 0,
+        };
+      }
+      case 'POST calc/creative': {
+        const c = creativeAnalysis(body.creative || {});
+        // Work backwards from the investor's cash limit to the most cash you can offer the seller.
+        const maxEntry = Number(body.maxEntryFee) || 0;
+        const i = c.inputs;
+        const maxSellerCash = maxEntry ? maxEntry - i.arrears - i.closingCosts - i.yourFee : null;
+        return { ...c, maxEntryFee: maxEntry, maxSellerCash };
+      }
       case 'POST deals/:id/creative':
         return creativeFor(dealOr404(id), body.creative);
       // Save how the investor buys (cash or creative) and the seller's loan details.

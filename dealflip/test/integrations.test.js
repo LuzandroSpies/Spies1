@@ -146,3 +146,15 @@ test('creative deals: save terms, analyze, match creative buyers, and draft crea
   assert.match(email.text, /Subject-to deal/);
   assert.match(email.text, /Entry fee: \$14,500/);
 });
+
+test('quick calculator: cash offer and creative cash-to-seller', async () => {
+  const handle = createApi({ store: memStore(), ai });
+  const cash = await handle('POST', '/api/calc/cash', { arv: 100000, repairs: 20000, fee: 10000, askingPrice: 35000 });
+  assert.strictEqual(cash.investorMax, 50000);
+  assert.strictEqual(cash.maxOffer, 40000);
+  assert.strictEqual(cash.feeAtAsking, 15000);
+  const cr = await handle('POST', '/api/calc/creative', { creative: { loanBalance: 150000, loanPayment: 1200, loanRate: 3, arrears: 2000, yourFee: 8000, rent: 1900, value: 200000 }, maxEntryFee: 25000 });
+  assert.strictEqual(cr.structure, 'subject-to');
+  assert.strictEqual(cr.maxSellerCash, 25000 - 2000 - 3000 - 8000);
+  assert.strictEqual(cr.entryFee, 13000);
+});

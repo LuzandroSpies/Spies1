@@ -23,7 +23,10 @@
     <section class="list-pane" aria-label="Deals">
       <div class="list-head">
         <h1>Deals</h1>
-        <button id="add-deals-btn" type="button">+ Add deals</button>
+        <div class="button-row">
+          <button class="secondary" id="calc-btn" type="button">Calculator</button>
+          <button id="add-deals-btn" type="button">+ Add deals</button>
+        </div>
       </div>
       <input id="search" type="search" placeholder="Search address or city" aria-label="Search deals">
       <div class="chips" role="group" aria-label="Filter">
@@ -276,6 +279,66 @@
       <p>The loan stays in the seller's name, so if the investor stops paying, the seller's credit suffers. The lender's <b>due-on-sale clause</b> also lets it demand the whole balance after a sale. Legitimate operators put every risk in writing for the seller to initial, use a <b>loan servicing company</b> so the seller can see every payment, close with a title company that knows creative deals, and never rush a seller who is behind on payments. Several states have strict rules for buying from owners in foreclosure. Have a local attorney check your documents.</p>
     </div>
     <div class="sheet-actions"><button data-close type="button">Got it</button></div>
+  </dialog>
+
+  <dialog id="calc-dialog" class="sheet" aria-labelledby="calc-title">
+    <div class="sheet-head">
+      <h2 id="calc-title">Quick calculator</h2>
+      <button class="icon-btn" data-close type="button" aria-label="Close">×</button>
+    </div>
+    <p class="muted small">Work out an offer while you're talking to a seller. Nothing is saved until you tap "Save as a deal".</p>
+    <div class="segmented" role="group" aria-label="How will the investor buy?">
+      <button type="button" data-calc-mode="cash" class="active">With cash</button>
+      <button type="button" data-calc-mode="creative">Creative terms</button>
+    </div>
+
+    <div class="calc-result" id="calc-result" aria-live="polite"></div>
+
+    <form id="calc-form" class="form" novalidate>
+      <div data-calc-panel="cash">
+        <div class="two">
+          <label>Value after repairs<input id="c-arv" data-c="arv" type="number" inputmode="numeric" min="0" step="1000" placeholder="150000"></label>
+          <label>Repair cost<input id="c-repairs" data-c="repairs" type="number" inputmode="numeric" min="0" step="1000" placeholder="25000"></label>
+          <label>Fee you want<input id="c-fee" data-c="fee" type="number" inputmode="numeric" min="0" step="500" value="10000"></label>
+          <label>Seller's asking price (optional)<input id="c-askingPrice" data-c="askingPrice" type="number" inputmode="numeric" min="0" step="1000"></label>
+        </div>
+      </div>
+      <div data-calc-panel="creative" hidden>
+        <div class="two">
+          <label>Amount still owed<input id="cc-loanBalance" data-cc="loanBalance" type="number" inputmode="numeric" min="0" step="1000"></label>
+          <label>Monthly payment (with taxes &amp; insurance)<input id="cc-loanPayment" data-cc="loanPayment" type="number" inputmode="numeric" min="0" step="10"></label>
+          <label>Interest rate (%)<input id="cc-loanRate" data-cc="loanRate" type="number" inputmode="decimal" min="0" step="0.125"></label>
+          <label>Missed payments owed<input id="cc-arrears" data-cc="arrears" type="number" inputmode="numeric" min="0" step="100"></label>
+          <label>Monthly rent<input id="cc-rent" data-cc="rent" type="number" inputmode="numeric" min="0" step="25"></label>
+          <label>Value of the house<input id="cc-value" data-cc="value" type="number" inputmode="numeric" min="0" step="1000"></label>
+          <label>Your fee<input id="cc-yourFee" data-cc="yourFee" type="number" inputmode="numeric" min="0" step="500" value="8000"></label>
+          <label>Investor's most cash to close<input id="cc-maxEntryFee" data-cc-top="maxEntryFee" type="number" inputmode="numeric" min="0" step="1000" value="25000"></label>
+        </div>
+        <details class="fold-plain">
+          <summary>The seller also carries a loan</summary>
+          <div class="two">
+            <label>Amount the seller lends<input id="cc-noteAmount" data-cc="noteAmount" type="number" inputmode="numeric" min="0" step="1000"></label>
+            <label>Interest rate (%)<input id="cc-noteRate" data-cc="noteRate" type="number" inputmode="decimal" min="0" step="0.25"></label>
+            <label>Paid over (years)<input id="cc-noteYears" data-cc="noteYears" type="number" inputmode="numeric" min="1" step="1" placeholder="30"></label>
+            <label>Cash to the seller<input id="cc-sellerCash" data-cc="sellerCash" type="number" inputmode="numeric" min="0" step="500"></label>
+          </div>
+        </details>
+      </div>
+    </form>
+
+    <details class="fold-plain" id="calc-save">
+      <summary>Save as a deal</summary>
+      <form id="calc-save-form" class="form">
+        <div class="two">
+          <label>Address<input id="cs-address" name="address" required></label>
+          <label>City<input id="cs-city" name="city"></label>
+          <label>State<input id="cs-state" name="state" maxlength="2" placeholder="OH"></label>
+          <label>Owner's name<input id="cs-ownerName" name="ownerName"></label>
+        </div>
+        <p class="form-error" id="calc-save-error"></p>
+        <button type="submit">Save and open</button>
+      </form>
+    </details>
   </dialog>
 
   <script src="app.js"></script>

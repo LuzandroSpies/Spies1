@@ -397,3 +397,18 @@ section > h2 { margin-bottom: 10px; }
 .guide { display: grid; gap: 10px; max-height: 62vh; overflow: auto; padding-right: 4px; }
 .guide h3 { margin-top: 6px; }
 .guide p { font-size: 15px; }
+
+/* quick calculator */
+.calc-result { display: grid; gap: 10px; min-height: 60px; }
+.calc-big { display: grid; gap: 2px; border-radius: 14px; padding: 14px 16px; background: var(--soft); }
+.calc-big span { font-size: 14px; color: var(--muted); }
+.calc-big b { font-size: 30px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.calc-big.good { background: var(--good-soft); }
+.calc-big.good b { color: var(--good); }
+.calc-big.warn { background: var(--warn-soft); }
+.calc-big.warn b { color: var(--warn); }
+.calc-big.bad { background: var(--bad-soft); }
+.calc-big.bad b { color: var(--bad); }
+.calc-result .mini-stats { margin: 0; }
+.list-head .button-row { flex-wrap: nowrap; }
+@media (max-width: 400px) { .list-head { flex-wrap: wrap; } }

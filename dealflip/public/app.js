@@ -739,6 +739,103 @@ async function saveStatus() {
   }
 }
 
+// ---------- quick calculator ----------
+const calc = { mode: 'cash', cash: { fee: 10000 }, creative: { yourFee: 8000 }, maxEntryFee: 25000 };
+
+function setCalcMode(mode) {
+  calc.mode = mode;
+  $$('[data-calc-mode]').forEach((b) => b.classList.toggle('active', b.dataset.calcMode === mode));
+  $$('[data-calc-panel]').forEach((p) => (p.hidden = p.dataset.calcPanel !== mode));
+  runCalc();
+}
+
+const runCalc = debounce(async () => {
+  const out = $('#calc-result');
+  try {
+    if (calc.mode === 'cash') {
+      if (!(calc.cash.arv > 0)) {
+        out.innerHTML = '<p class="muted">Enter the value after repairs and the repair cost.</p>';
+        return;
+      }
+      const r = await api('/api/calc/cash', { method: 'POST', body: calc.cash });
+      const ok = r.maxOffer > 0;
+      out.innerHTML = `
+        <div class="calc-big ${ok ? 'good' : 'bad'}"><span>Offer the seller up to</span><b>${ok ? money(r.maxOffer) : 'No room'}</b></div>
+        <p class="small">Investors usually pay up to <b>${money(r.investorMax)}</b> for this house. Take off your ${money(r.fee)} fee and that leaves ${ok ? `<b>${money(r.maxOffer)}</b> for the seller` : 'nothing for the seller'}.</p>
+        ${r.feeAtAsking !== null ? `<p class="flag ${r.feeAtAsking >= r.fee ? 'info' : r.feeAtAsking > 0 ? 'warn' : 'bad'}">At their asking price of ${money(r.askingPrice)}, you'd make ${r.feeAtAsking > 0 ? `about <b>${money(r.feeAtAsking)}</b>` : 'nothing'}.${r.feeAtAsking <= 0 ? ' Try creative terms instead.' : ''}</p>` : ''}`;
+    } else {
+      const r = await api('/api/calc/creative', { method: 'POST', body: { creative: calc.creative, maxEntryFee: calc.maxEntryFee } });
+      if (r.structure === 'none' || !(r.inputs.rent > 0)) {
+        out.innerHTML = '<p class="muted">Enter the amount owed (or what the seller lends), the monthly payment and the rent.</p>';
+        return;
+      }
+      const first = r.flags.find((f) => f.level === 'bad') || r.flags.find((f) => f.level === 'warn');
+      out.innerHTML = `
+        <div class="calc-big ${VERDICT[r.verdict].cls}"><span>${esc(STRUCTURE_NAME[r.structure])}: investor keeps</span><b>${money(r.cashFlow)}/month</b></div>
+        <div class="mini-stats">
+          <div><span>Investor brings</span><b>${money(r.entryFee)}</b></div>
+          <div><span>Pays each month</span><b>${money(r.totalPayment)}</b></div>
+          <div><span>Equity</span><b class="${r.equity < 0 ? 'neg' : ''}">${money(r.equity)}</b></div>
+          <div><span>Cash you can offer the seller</span><b class="${r.maxSellerCash !== null && r.maxSellerCash < 0 ? 'neg' : ''}">${r.maxSellerCash === null ? '—' : r.maxSellerCash > 0 ? `up to ${money(r.maxSellerCash)}` : 'none'}</b></div>
+        </div>
+        ${r.maxSellerCash !== null ? `<p class="small muted">An investor bringing at most ${money(r.maxEntryFee)}, minus ${r.inputs.arrears ? `${money(r.inputs.arrears)} missed payments, ` : ''}${money(r.inputs.closingCosts)} closing costs and your ${money(r.inputs.yourFee)} fee.</p>` : ''}
+        ${first ? `<p class="flag ${first.level}">${esc(first.text)}</p>` : ''}`;
+    }
+  } catch (err) {
+    out.innerHTML = `<p class="flag bad">${esc(err.message)}</p>`;
+  }
+}, 150);
+
+$('#calc-btn').addEventListener('click', () => {
+  openDialog($('#calc-dialog'));
+  runCalc();
+});
+$('#calc-dialog').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-calc-mode]');
+  if (b) setCalcMode(b.dataset.calcMode);
+});
+$('#calc-form').addEventListener('input', (e) => {
+  const t = e.target;
+  const v = t.value === '' ? undefined : Number(t.value);
+  if (t.dataset.c) calc.cash[t.dataset.c] = v;
+  if (t.dataset.cc) calc.creative[t.dataset.cc] = v;
+  if (t.dataset.ccTop) calc[t.dataset.ccTop] = v || 0;
+  runCalc();
+});
+$('#calc-form').addEventListener('submit', (e) => e.preventDefault());
+
+$('#calc-save-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = Object.fromEntries(new FormData(e.target));
+  const creative = calc.mode === 'creative';
+  const c = calc.creative;
+  const body = {
+    ...fd,
+    state: (fd.state || '').toUpperCase(),
+    propertyType: 'single-family',
+    saleType: 'Off-market',
+    // A deal needs a price: the most to offer for cash, or the creative price (loan + seller loan + cash).
+    askingPrice: creative ? (c.loanBalance || 0) + (c.noteAmount || 0) + (c.sellerCash || 0) || 1 : calc.cash.askingPrice || Math.max(1, (calc.cash.arv || 0) * 0.7 - (calc.cash.repairs || 0) - (calc.cash.fee || 0)),
+    estimatedValue: creative ? c.value || 0 : calc.cash.arv || 0,
+    estimatedRepairs: creative ? 0 : calc.cash.repairs || 0,
+    estimatedRent: creative ? c.rent || 0 : 0,
+    notes: 'Saved from the quick calculator.',
+  };
+  try {
+    const deal = await api('/api/deals', { method: 'POST', body });
+    if (creative) await api(`/api/deals/${encodeURIComponent(deal.id)}/creative`, { method: 'PUT', body: { mode: 'creative', creative: c } });
+    $('#calc-dialog').close();
+    e.target.reset();
+    $('#calc-save').open = false;
+    $('#calc-save-error').textContent = '';
+    showView('deals');
+    await loadDeals();
+    openDeal(deal.id);
+  } catch (err) {
+    $('#calc-save-error').textContent = err.message;
+  }
+});
+
 // ---------- add deals ----------
 const addDialog = $('#add-dialog');
 function showAddPanel(name) {
