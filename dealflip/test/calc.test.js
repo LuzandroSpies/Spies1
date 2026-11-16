@@ -15,7 +15,7 @@ test('repairs and title costs make the $50k buyer price unrealistic', () => {
   assert.strictEqual(a.realisticFee, 18741);
   assert.ok(a.buyerProfit < 0, 'end buyer should lose money at $50k');
   assert.strictEqual(a.verdict, 'does-not-work');
-  assert.ok(a.flags.some((f) => /over the 70% rule/.test(f.text)));
+  assert.ok(a.flags.some((f) => /more than they'd usually pay/.test(f.text)));
 });
 
 test('a healthy deal is marked as working', () => {
@@ -27,7 +27,7 @@ test('a healthy deal is marked as working', () => {
 
 test('contract above buyer max is flagged', () => {
   const a = analyzeDeal({ arv: 100000, contractPrice: 80000, buyerPrice: 85000, repairs: 10000 });
-  assert.ok(a.flags.some((f) => f.level === 'bad' && /no room for a fee/.test(f.text)));
+  assert.ok(a.flags.some((f) => f.level === 'bad' && /no room for your fee/.test(f.text)));
   assert.strictEqual(a.realisticFee, 0);
 });
 
@@ -69,7 +69,7 @@ test('rental view: BRRRR on a healthy deal', () => {
   assert.strictEqual(r.refiLoan, 126000);
   assert.ok(r.cashLeftIn < 0, 'refi returns all cash');
   assert.strictEqual(r.cashOnCash, null);
-  assert.ok(r.flags.some((f) => /cash-out/.test(f.text)));
+  assert.ok(r.flags.some((f) => /pay back all of the investor's cash/.test(f.text)));
 });
 
 test('rental view flags negative cash flow and estimates rent when missing', () => {

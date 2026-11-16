@@ -15,7 +15,7 @@ auction rules (a county auction usually cannot be "put under contract" or assign
 title insurability and quiet-title costs, occupancy, unseen condition, and state rules on
 wholesaling (licensing, disclosure, and marketing a property you do not own).
 Do not give legal advice; tell the user when an attorney or title company must confirm something.
-Write in plain English for someone new to real estate. Use short sections and bullet points.`;
+Write in plain English for someone new to real estate: avoid jargon like ARV or comps, or explain it in a few words. Use short sections and bullet points.`;
 
 let client = null;
 let clientError = null;
@@ -147,8 +147,8 @@ function fallbackReview(deal, a) {
   const verdictText = { works: 'Works on paper', tight: 'Tight', 'does-not-work': 'Does not work as entered' }[a.verdict];
   lines.push(`Verdict: ${verdictText}.`);
   lines.push('');
-  lines.push(`A 70%-rule cash buyer would pay at most about ${money(a.buyerMaxPrice)}.`);
-  lines.push(`At your contract price that leaves a realistic fee of about ${money(a.realisticFee)}.`);
+  lines.push(`An investor would usually pay at most about ${money(a.buyerMaxPrice)}.`);
+  lines.push(`At your price, that leaves you a fee of about ${money(a.realisticFee)}.`);
   if (a.flags.length) {
     lines.push('');
     lines.push('Flags:');
@@ -156,7 +156,7 @@ function fallbackReview(deal, a) {
   }
   lines.push('');
   lines.push('Verify before signing:');
-  lines.push('- Pull 3-5 sold comps within 0.5 miles from the last 6 months to confirm the ARV.');
+  lines.push('- Find 3-5 similar houses that sold nearby in the last 6 months to confirm the value after repairs.');
   lines.push('- See the inside or get a contractor walkthrough before trusting the repair number.');
   lines.push('- Order a title search; confirm the seller can deliver clear, insurable title.');
   lines.push('- Confirm the contract can be assigned and that your state allows it without a license.');

@@ -2,187 +2,254 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>DealFlip</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="top">
-    <div class="brand">DealFlip <span class="sub">deal finder &amp; assignment calculator</span></div>
-    <nav>
-      <button class="tab active" data-view="deals">Deals</button>
-      <button class="tab" data-view="pipeline">Pipeline</button>
-      <button class="tab" data-view="buyers">Cash buyers</button>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span>DealFlip</div>
+    <nav class="tabs" aria-label="Main">
+      <button class="tab active" data-view="deals" type="button"><span class="tab-icon icon-home" aria-hidden="true"></span>Deals</button>
+      <button class="tab" data-view="progress" type="button"><span class="tab-icon icon-chart" aria-hidden="true"></span>Progress</button>
+      <button class="tab" data-view="investors" type="button"><span class="tab-icon icon-people" aria-hidden="true"></span>Investors</button>
     </nav>
-    <span id="ai-status" class="pill">AI: checking…</span>
   </header>
 
-  <p class="disclaimer">
-    Educational tool. Listing values are estimates, the sample data is fictional, and nothing here is legal or financial advice.
-    Confirm comps, title, and your state's wholesaling rules with a local attorney or title company before signing anything.
-  </p>
-
-  <main id="view-deals" class="view">
-    <aside class="list-pane">
-      <div class="filters">
-        <select id="f-type">
-          <option value="">All sale types</option>
-          <option>Tax Deed</option><option>Tax Lien</option><option>Foreclosure</option>
-          <option>Probate</option><option>Off-market</option>
-        </select>
-        <select id="f-state"><option value="">All states</option></select>
-        <select id="f-source" aria-label="List"><option value="">All lists</option></select>
-        <input id="f-max" type="number" placeholder="Max price" min="0" step="1000" aria-label="Max price">
-        <label class="check-row"><input id="f-works" type="checkbox"> Only deals that work</label>
+  <!-- ================= DEALS ================= -->
+  <main id="view-deals" class="view deals-layout">
+    <section class="list-pane" aria-label="Deals">
+      <div class="list-head">
+        <h1>Deals</h1>
+        <button id="add-deals-btn" type="button">+ Add deals</button>
       </div>
-      <div class="row-start">
-        <button id="import-btn" class="grow">Import a list</button>
-        <button id="add-deal-btn" class="secondary grow">+ Add a deal</button>
+      <input id="search" type="search" placeholder="Search address or city" aria-label="Search deals">
+      <div class="chips" role="group" aria-label="Filter">
+        <button class="chip active" data-filter="all" type="button">All</button>
+        <button class="chip" data-filter="good" type="button">Good deals</button>
+        <button class="chip" data-filter="tracked" type="button">In progress</button>
+        <select id="f-source" class="chip-select" aria-label="List" hidden></select>
       </div>
-      <div class="muted small" id="deal-count"></div>
       <ul id="deal-list" class="deal-list"></ul>
-    </aside>
+      <p class="muted small center" id="deal-count"></p>
+    </section>
 
-    <section id="detail" class="detail">
-      <p class="empty">Pick a deal on the left to run the numbers.</p>
+    <section id="detail" class="detail-pane" aria-live="polite">
+      <div class="empty-state">
+        <h2>Pick a deal</h2>
+        <p>Tap any property on the list to see if it makes money.</p>
+      </div>
     </section>
   </main>
 
-  <main id="view-pipeline" class="view hidden">
-    <section class="pipeline-pane">
-      <div class="goal-head">
-        <div>
-          <h2>Goal</h2>
-          <div id="goal-summary" class="muted"></div>
-        </div>
-        <form id="goal-form" class="goal-form">
-          <label>Amount<input id="goal-amount" name="amount" type="number" min="0" step="1000"></label>
-          <label>By<input id="goal-deadline" name="deadline" type="date"></label>
-          <button type="submit" class="secondary">Save goal</button>
-        </form>
-      </div>
-      <div class="goal-bar" id="goal-bar" role="img" aria-label="Progress toward goal"></div>
-      <div class="goal-legend" id="goal-legend"></div>
-      <h3>Needs attention</h3>
-      <ul class="flags" id="alerts"></ul>
-      <div class="board" id="board"></div>
-    </section>
-    <section class="pipeline-pane" id="checklist-pane">
-      <div class="goal-head">
-        <div>
-          <h2>Setup checklist</h2>
-          <div class="muted" id="checklist-summary"></div>
-        </div>
-      </div>
-      <div class="goal-bar"><span class="seg-closed" id="checklist-bar" style="width:0%"></span></div>
-      <div id="checklist"></div>
-    </section>
-  </main>
+  <!-- ================= PROGRESS ================= -->
+  <main id="view-progress" class="view narrow" hidden>
+    <h1>Progress</h1>
 
-  <main id="view-buyers" class="view hidden">
-    <section class="buyers-pane">
-      <div class="signup-box">
-        <h2>Let investors sign themselves up</h2>
-        <div id="signup-link-row" class="row-start" hidden>
-          <span>Send investors this link: <b id="signup-link" class="mono"></b></span>
-          <button class="secondary" id="copy-signup-link" type="button">Copy link</button>
+    <section class="card goal-card">
+      <div class="goal-top">
+        <div>
+          <div class="label">Lined up toward your goal</div>
+          <div class="goal-amount"><span id="goal-lined">$0</span> <span class="muted">of <span id="goal-total">$0</span></span></div>
         </div>
-        <p class="muted" id="signup-offline">The sign-up form goes live with the full app online, at <b>/join</b> on its address. Until then, paste these questions into WhatsApp or email and add the answers below.</p>
-        <pre class="questions" id="signup-questions"></pre>
-        <button class="secondary" id="copy-questions" type="button">Copy questions</button>
+        <button class="link" id="edit-goal" type="button">Edit goal</button>
       </div>
-
-      <h2>Your cash buyers list</h2>
-      <p class="muted">Matching uses each buyer's buy box: where they buy, their price range, property types and rehab level. Add real buyers you've talked to; the samples are fictional.</p>
-      <div id="buyer-table"></div>
-      <h3>Add a buyer</h3>
-      <form id="buyer-form" class="grid-form">
-        <label>Name<input name="name" required></label>
-        <label>Contact<input name="contact" placeholder="email or phone"></label>
-        <label>States<input name="states" placeholder="OH, MI"></label>
-        <label>Counties<input name="counties" placeholder="Lake, Wayne"></label>
-        <label>Min price<input name="minPrice" type="number" min="0"></label>
-        <label>Max price<input name="maxPrice" type="number" min="0"></label>
-        <label>Property types<input name="propertyTypes" value="single-family"></label>
-        <label>Rehab levels<input name="rehabLevels" value="light, medium, heavy"></label>
-        <label class="check"><input name="proofOfFunds" type="checkbox"> Proof of funds on file</label>
-        <label class="wide">Notes<input name="notes"></label>
-        <button type="submit">Save buyer</button>
+      <div class="bar" aria-hidden="true"><span class="bar-paid" id="bar-paid"></span><span class="bar-signed" id="bar-signed"></span><span class="bar-contract" id="bar-contract"></span></div>
+      <div class="legend">
+        <span><i class="dot dot-paid"></i>Paid <b id="sum-paid">$0</b></span>
+        <span><i class="dot dot-signed"></i>Investor signed <b id="sum-signed">$0</b></span>
+        <span><i class="dot dot-contract"></i>Under contract <b id="sum-contract">$0</b></span>
+      </div>
+      <p class="muted small" id="goal-note"></p>
+      <form id="goal-form" class="inline-form" hidden>
+        <label>Goal amount<input id="goal-amount" type="number" min="0" step="1000"></label>
+        <label>By<input id="goal-deadline" type="date"></label>
+        <button type="submit">Save</button>
       </form>
     </section>
+
+    <section>
+      <h2>Do this next</h2>
+      <ul class="todo" id="alerts"></ul>
+    </section>
+
+    <section>
+      <h2>Your deals</h2>
+      <div id="by-status"></div>
+    </section>
+
+    <details class="card fold" id="checklist-fold">
+      <summary><span><b>Getting started checklist</b> <span class="muted" id="checklist-count"></span></span></summary>
+      <div class="bar thin" aria-hidden="true"><span class="bar-paid" id="checklist-bar"></span></div>
+      <div id="checklist"></div>
+    </details>
   </main>
 
-  <dialog id="deal-dialog">
-    <form id="deal-form" method="dialog" class="grid-form">
-      <h3 class="wide">Add a deal</h3>
-      <label class="wide">Address<input name="address" required></label>
-      <label>City<input name="city"></label>
-      <label>County<input name="county"></label>
-      <label>State<input name="state" maxlength="2" placeholder="OH"></label>
-      <label>Sale type
-        <select name="saleType"><option>Tax Deed</option><option>Tax Lien</option><option>Foreclosure</option><option>Probate</option><option selected>Off-market</option></select>
-      </label>
-      <label>Property type<input name="propertyType" value="single-family"></label>
-      <label>Beds<input name="beds" type="number" step="1" min="0"></label>
-      <label>Baths<input name="baths" type="number" step="0.5" min="0"></label>
-      <label>Sqft<input name="sqft" type="number" min="0"></label>
-      <label>Year built<input name="yearBuilt" type="number"></label>
-      <label>Price / opening bid<input name="askingPrice" type="number" min="0" required></label>
-      <label>Estimated value (ARV)<input name="estimatedValue" type="number" min="0"></label>
-      <label>Estimated repairs<input name="estimatedRepairs" type="number" min="0"></label>
-      <label>Condition
-        <select name="condition"><option>light</option><option selected>medium</option><option>heavy</option></select>
-      </label>
-      <label>Title / liens / back taxes<input name="titleAndLiens" type="number" min="0"></label>
-      <label>Sale date<input name="saleDate" type="date"></label>
-      <label class="wide">Notes<input name="notes"></label>
-      <div class="wide row-end">
-        <button type="button" class="secondary" id="deal-cancel">Cancel</button>
-        <button type="submit">Save deal</button>
+  <!-- ================= INVESTORS ================= -->
+  <main id="view-investors" class="view narrow" hidden>
+    <div class="list-head">
+      <h1>Investors</h1>
+      <button id="add-investor-btn" type="button">+ Add investor</button>
+    </div>
+    <p class="muted">The people who buy your deals. DealFlip matches each property to the investors whose area and price range fit.</p>
+
+    <section class="card invite">
+      <h2>Get more investors</h2>
+      <div id="invite-online" hidden>
+        <p>Send this link. Investors fill in what they buy, and they appear here automatically.</p>
+        <div class="copy-row"><code id="signup-link"></code><button class="secondary" id="copy-signup-link" type="button">Copy link</button></div>
       </div>
-    </form>
+      <div id="invite-offline">
+        <p>Send these questions on WhatsApp or email, then add the answers with <b>+ Add investor</b>.</p>
+      </div>
+      <details class="fold-plain">
+        <summary>Show the questions</summary>
+        <pre class="questions" id="signup-questions"></pre>
+      </details>
+      <button class="secondary" id="copy-questions" type="button">Copy questions</button>
+    </section>
+
+    <div id="investor-list" class="investor-list"></div>
+  </main>
+
+  <p class="footnote">Numbers are estimates, not legal or financial advice. Check values, title and your state's rules before you sign. <button class="link" id="reset-preview" type="button" hidden>Reset sample data</button></p>
+
+  <!-- ================= DIALOGS ================= -->
+  <dialog id="doc-dialog" class="sheet" aria-labelledby="doc-title">
+    <div class="sheet-head">
+      <h2 id="doc-title">Document</h2>
+      <button class="icon-btn" data-close type="button" aria-label="Close">×</button>
+    </div>
+    <p class="muted small" id="doc-note"></p>
+    <pre id="doc-text" class="doc"></pre>
+    <div class="sheet-actions">
+      <button id="doc-copy" type="button">Copy</button>
+      <button class="secondary" data-close type="button">Close</button>
+    </div>
   </dialog>
 
-  <dialog id="import-dialog">
-    <form id="import-form" class="grid-form">
-      <h3 class="wide">Import a list</h3>
-      <p class="wide muted small">Upload a CSV from your county's tax-sale or tax-delinquent list, or an export from an investor tool. It needs at least an address column and a price, bid or amount-due column. A value column (market or assessed value) lets it score each deal; repairs are estimated as a share of that value until you check them.</p>
-      <label class="wide">CSV file<input id="import-file" type="file" accept=".csv,text/csv" required></label>
-      <label>List name<input id="import-source" name="source" placeholder="e.g. Lake County Dec tax sale" required></label>
-      <label>Sale type
-        <select id="import-saleType" name="saleType"><option>Tax Deed</option><option>Tax Lien</option><option>Foreclosure</option><option>Probate</option><option>Off-market</option></select>
-      </label>
-      <label>County (if not in file)<input id="import-county" name="county"></label>
-      <label>State (if not in file)<input id="import-state" name="state" maxlength="2"></label>
-      <label>City (if not in file)<input id="import-city" name="city"></label>
-      <label>Repair estimate, % of value
-        <select id="import-repairPct" name="repairPct"><option value="0.1">10% (light)</option><option value="0.2" selected>20% (medium)</option><option value="0.3">30% (heavy)</option><option value="0.4">40% (very heavy)</option></select>
-      </label>
-      <div class="wide" id="import-result"></div>
-      <div class="wide row-end">
-        <button type="button" class="secondary" id="import-cancel">Close</button>
-        <button type="submit" id="import-submit">Import</button>
+  <dialog id="add-dialog" class="sheet" aria-labelledby="add-title">
+    <div class="sheet-head">
+      <h2 id="add-title">Add deals</h2>
+      <button class="icon-btn" data-close type="button" aria-label="Close">×</button>
+    </div>
+
+    <div id="add-choices" class="choices">
+      <button class="choice" data-choice="upload" type="button"><b>Upload a county list</b><span>A spreadsheet (CSV) of tax-sale or tax-delinquent properties. Every row gets checked for you.</span></button>
+      <button class="choice" data-choice="one" type="button"><b>Add one property</b><span>Type in a single house you found.</span></button>
+      <button class="choice" data-choice="auto" type="button"><b>Pull a list every day</b><span>Save a link to a county list and new properties get added automatically.</span></button>
+    </div>
+
+    <form id="upload-form" class="form" data-panel="upload" hidden>
+      <label>List file (CSV)<input id="upload-file" type="file" accept=".csv,text/csv" required></label>
+      <label>Name this list<input id="upload-source" name="source" placeholder="e.g. Lake County December sale" required></label>
+      <div class="two">
+        <label>Type of sale<select id="upload-saleType" name="saleType"><option>Tax Deed</option><option>Tax Lien</option><option>Foreclosure</option><option>Probate</option><option>Off-market</option></select></label>
+        <label>Repair guess<select id="upload-repairPct" name="repairPct"><option value="0.1">Light (10% of value)</option><option value="0.2" selected>Medium (20%)</option><option value="0.3">Heavy (30%)</option><option value="0.4">Very heavy (40%)</option></select></label>
+      </div>
+      <details class="fold-plain">
+        <summary>Fill in missing details</summary>
+        <div class="two">
+          <label>County<input id="upload-county" name="county"></label>
+          <label>State<input id="upload-state" name="state" maxlength="2" placeholder="OH"></label>
+          <label>City<input id="upload-city" name="city"></label>
+        </div>
+      </details>
+      <p class="muted small">The file needs an address column and a price, bid or amount-due column. A value column lets DealFlip score each property.</p>
+      <div id="upload-result"></div>
+      <div class="sheet-actions">
+        <button type="submit" id="upload-submit">Upload</button>
+        <button class="secondary" data-back type="button">Back</button>
       </div>
     </form>
-    <div class="sources">
-      <h3>Or pull a list automatically</h3>
-      <p class="muted small" id="sources-note"></p>
-      <form id="source-form" class="grid-form">
-        <label class="wide">Direct link to the CSV file<input id="source-url" name="url" type="url" placeholder="https://..." required></label>
-        <label>List name<input id="source-name" name="name" required></label>
-        <label>Sale type
-          <select id="source-saleType" name="saleType"><option>Tax Deed</option><option>Tax Lien</option><option>Foreclosure</option><option>Probate</option><option>Off-market</option></select>
-        </label>
-        <label>County<input id="source-county" name="county"></label>
-        <label>State<input id="source-state" name="state" maxlength="2"></label>
-        <label>Repair estimate
-          <select id="source-repairPct" name="repairPct"><option value="0.1">10%</option><option value="0.2" selected>20%</option><option value="0.3">30%</option><option value="0.4">40%</option></select>
-        </label>
-        <div class="row-end"><button type="submit" class="secondary">Save link</button></div>
-        <div class="wide form-error" id="source-error"></div>
+
+    <form id="one-form" class="form" data-panel="one" hidden>
+      <label>Address<input name="address" id="one-address" required></label>
+      <div class="two">
+        <label>City<input name="city" id="one-city"></label>
+        <label>State<input name="state" id="one-state" maxlength="2" placeholder="OH"></label>
+        <label>Asking price<input name="askingPrice" id="one-askingPrice" type="number" min="0" required></label>
+        <label>Value after repairs<input name="estimatedValue" id="one-estimatedValue" type="number" min="0"></label>
+        <label>Repair cost<input name="estimatedRepairs" id="one-estimatedRepairs" type="number" min="0"></label>
+        <label>Type of sale<select name="saleType" id="one-saleType"><option>Off-market</option><option>Tax Deed</option><option>Tax Lien</option><option>Foreclosure</option><option>Probate</option></select></label>
+      </div>
+      <details class="fold-plain">
+        <summary>More details (optional)</summary>
+        <div class="two">
+          <label>County<input name="county" id="one-county"></label>
+          <label>Owner's name<input name="ownerName" id="one-ownerName"></label>
+          <label>Beds<input name="beds" id="one-beds" type="number" min="0"></label>
+          <label>Baths<input name="baths" id="one-baths" type="number" min="0" step="0.5"></label>
+          <label>Square feet<input name="sqft" id="one-sqft" type="number" min="0"></label>
+          <label>Unpaid taxes &amp; liens<input name="titleAndLiens" id="one-titleAndLiens" type="number" min="0"></label>
+          <label>Condition<select name="condition" id="one-condition"><option value="light">Light work</option><option value="medium" selected>Medium work</option><option value="heavy">Heavy work</option></select></label>
+          <label>Notes<input name="notes" id="one-notes"></label>
+        </div>
+      </details>
+      <p class="form-error" id="one-error"></p>
+      <div class="sheet-actions">
+        <button type="submit">Add property</button>
+        <button class="secondary" data-back type="button">Back</button>
+      </div>
+    </form>
+
+    <div data-panel="auto" hidden>
+      <p class="muted small" id="auto-note"></p>
+      <form id="source-form" class="form">
+        <label>Link to the CSV file<input id="source-url" name="url" type="url" placeholder="https://..." required></label>
+        <div class="two">
+          <label>Name this list<input id="source-name" name="name" required></label>
+          <label>Type of sale<select id="source-saleType" name="saleType"><option>Tax Deed</option><option>Tax Lien</option><option>Foreclosure</option><option>Probate</option><option>Off-market</option></select></label>
+          <label>County<input id="source-county" name="county"></label>
+          <label>State<input id="source-state" name="state" maxlength="2"></label>
+        </div>
+        <input type="hidden" name="repairPct" value="0.2">
+        <p class="form-error" id="source-error"></p>
+        <div class="sheet-actions">
+          <button type="submit">Save link</button>
+          <button class="secondary" data-back type="button">Back</button>
+        </div>
       </form>
-      <div id="sources-list"></div>
+      <div id="sources-list" class="sources-list"></div>
     </div>
+  </dialog>
+
+  <dialog id="investor-dialog" class="sheet" aria-labelledby="investor-title">
+    <div class="sheet-head">
+      <h2 id="investor-title">Add an investor</h2>
+      <button class="icon-btn" data-close type="button" aria-label="Close">×</button>
+    </div>
+    <form id="investor-form" class="form">
+      <div class="two">
+        <label>Name or company<input name="name" id="inv-name" required></label>
+        <label>Email or phone<input name="contact" id="inv-contact"></label>
+        <label>States they buy in<input name="states" id="inv-states" placeholder="OH, MI"></label>
+        <label>Counties<input name="counties" id="inv-counties" placeholder="Lake, Wayne"></label>
+        <label>Lowest price<input name="minPrice" id="inv-minPrice" type="number" min="0" step="1000"></label>
+        <label>Highest price<input name="maxPrice" id="inv-maxPrice" type="number" min="0" step="1000"></label>
+      </div>
+      <fieldset class="checks">
+        <legend>Repair level they take on</legend>
+        <label><input type="checkbox" name="rehabLevels" value="light" checked> Light</label>
+        <label><input type="checkbox" name="rehabLevels" value="medium" checked> Medium</label>
+        <label><input type="checkbox" name="rehabLevels" value="heavy"> Heavy</label>
+      </fieldset>
+      <fieldset class="checks">
+        <legend>What they do with houses</legend>
+        <label><input type="checkbox" name="strategies" value="flip" checked> Fix and sell</label>
+        <label><input type="checkbox" name="strategies" value="rental"> Keep as rentals</label>
+      </fieldset>
+      <label class="check-line"><input type="checkbox" name="proofOfFunds" id="inv-pof"> They've shown proof they have the cash</label>
+      <label>Notes<input name="notes" id="inv-notes"></label>
+      <input type="hidden" name="propertyTypes" value="single-family, duplex">
+      <p class="form-error" id="investor-error"></p>
+      <div class="sheet-actions">
+        <button type="submit">Save investor</button>
+        <button class="secondary" data-close type="button">Cancel</button>
+      </div>
+    </form>
   </dialog>
 
   <script src="app.js"></script>

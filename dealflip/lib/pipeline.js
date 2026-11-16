@@ -4,11 +4,11 @@
 const { money } = require('./calc');
 
 const STAGES = [
-  { id: 'lead', label: 'Lead' },
+  { id: 'lead', label: 'Not started' },
   { id: 'offer', label: 'Offer sent' },
   { id: 'contract', label: 'Under contract' },
-  { id: 'assigned', label: 'Buyer signed' },
-  { id: 'closed', label: 'Closed (paid)' },
+  { id: 'assigned', label: 'Investor signed' },
+  { id: 'closed', label: 'Paid' },
   { id: 'dead', label: 'Dead' },
 ];
 const STAGE_IDS = STAGES.map((s) => s.id);
@@ -81,21 +81,21 @@ function summarize(deals, { today, goal = {} }) {
     if (p.stage === 'offer' && p.offerDate) {
       const age = daysBetween(p.offerDate, today);
       card.when = `Offer sent ${age === 0 ? 'today' : `${age}d ago`}`;
-      if (age >= 3) alerts.push({ level: 'info', dealId: deal.id, text: `Follow up on your offer for ${name}: sent ${age} days ago.` });
+      if (age >= 3) alerts.push({ level: 'info', dealId: deal.id, text: `Follow up on your offer for ${name}. You sent it ${age} days ago.` });
     }
 
     if (p.stage === 'contract') {
       const ends = freeLookEnds(p);
       if (ends) {
         const left = daysBetween(today, ends);
-        card.when = left >= 0 ? `Free-look ends in ${left}d` : `Free-look ended ${-left}d ago`;
+        card.when = left >= 0 ? `Free cancel ends in ${left}d` : `Free cancel ended ${-left}d ago`;
         if (left < 0) {
-          alerts.push({ level: 'bad', dealId: deal.id, text: `Free-look on ${name} ended ${-left} days ago with no buyer signed. Your ${money(p.earnestMoney || 0)} earnest money is now at risk.` });
+          alerts.push({ level: 'bad', dealId: deal.id, text: `The free cancel period on ${name} ended ${-left} days ago with no investor signed. Your ${money(p.earnestMoney || 0)} deposit is now at risk.` });
         } else if (left <= 3) {
-          alerts.push({ level: 'warn', dealId: deal.id, text: `Free-look on ${name} ends in ${left} day${left === 1 ? '' : 's'} (${ends}) and no buyer has signed. Find one or cancel in writing before then.` });
+          alerts.push({ level: 'warn', dealId: deal.id, text: `The free cancel period on ${name} ends in ${left} day${left === 1 ? '' : 's'} (${ends}) and no investor has signed. Find one, or cancel in writing before then.` });
         }
       } else {
-        alerts.push({ level: 'warn', dealId: deal.id, text: `Add the contract date for ${name} so free-look deadline alerts work.` });
+        alerts.push({ level: 'warn', dealId: deal.id, text: `Add the date you signed the contract for ${name}, so you get deadline reminders.` });
       }
     }
 
@@ -103,9 +103,9 @@ function summarize(deals, { today, goal = {} }) {
       const left = daysBetween(today, p.closingDate);
       if (p.stage === 'assigned') card.when = left >= 0 ? `Closes in ${left}d` : `Closing was ${-left}d ago`;
       if (left < 0) {
-        alerts.push({ level: 'bad', dealId: deal.id, text: `Closing date for ${name} (${p.closingDate}) has passed. Check with the title company, and mark it closed or extend it in writing.` });
+        alerts.push({ level: 'bad', dealId: deal.id, text: `The closing date for ${name} (${p.closingDate}) has passed. Check with the title company, then mark it paid or agree a new date in writing.` });
       } else if (left <= 7) {
-        alerts.push({ level: 'info', dealId: deal.id, text: `${name} closes in ${left} day${left === 1 ? '' : 's'}. Confirm the title company has everything it needs.` });
+        alerts.push({ level: 'info', dealId: deal.id, text: `${name} closes in ${left} day${left === 1 ? '' : 's'}. Check the title company has everything it needs.` });
       }
     }
 

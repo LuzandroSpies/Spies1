@@ -64,32 +64,32 @@ function analyzeDeal(raw = {}) {
 
   const flags = [];
   if (arv <= 0) {
-    flags.push({ level: 'bad', text: 'Enter an after-repair value (ARV) backed by recent comparable sales.' });
+    flags.push({ level: 'bad', text: 'Add what the house will be worth after repairs. Check recent sales of similar houses nearby.' });
   }
   if (contractPrice > 0 && contractPrice > buyerMaxPrice) {
     flags.push({
       level: 'bad',
-      text: `Your contract price is above what a 70%-rule investor would pay (${money(buyerMaxPrice)}). There is no room for a fee.`,
+      text: `Your price is higher than an investor would pay (up to ${money(buyerMaxPrice)}), so there's no room for your fee.`,
     });
   }
   if (buyerPrice > buyerMaxPrice && arv > 0) {
     flags.push({
       level: 'warn',
-      text: `Asking your buyer for ${money(buyerPrice)} is ${money(buyerPrice - buyerMaxPrice)} over the 70% rule max (${money(buyerMaxPrice)}). Experienced cash buyers will likely pass.`,
+      text: `You're asking the investor ${money(buyerPrice - buyerMaxPrice)} more than they'd usually pay (up to ${money(buyerMaxPrice)}). Most will say no.`,
     });
   }
   if (arv > 0 && buyerProfit < 0) {
-    flags.push({ level: 'bad', text: `At this price the end buyer loses about ${money(-buyerProfit)}. Nobody informed will take it.` });
+    flags.push({ level: 'bad', text: `The investor would lose about ${money(-buyerProfit)} at this price, so they won't buy.` });
   } else if (arv > 0 && buyerMargin < 0.1) {
-    flags.push({ level: 'warn', text: 'End buyer profit is under 10% of ARV, which is thin for a flip.' });
+    flags.push({ level: 'warn', text: "The investor's profit is under 10% of the value. That's thin for a flip." });
   }
   if (assignmentFee <= 0 && buyerPrice > 0) {
-    flags.push({ level: 'bad', text: 'Buyer price is not above your contract price, so there is no assignment fee.' });
+    flags.push({ level: 'bad', text: "The investor's price isn't higher than yours, so you'd make nothing." });
   }
   if (earnestMoney > 0) {
     flags.push({
       level: 'info',
-      text: `You risk your ${money(earnestMoney)} earnest money if you cannot find a buyer and your contract has no exit (inspection or assignment contingency).`,
+      text: `Your ${money(earnestMoney)} deposit is only safe during the days you can cancel free. Find an investor before then.`,
     });
   }
 
@@ -214,16 +214,16 @@ function rentalAnalysis(raw = {}) {
   const cashFlowAfterRefi = noi / 12 - payment;
 
   const flags = [];
-  if (arv <= 0) flags.push({ level: 'bad', text: 'Enter an after-repair value to run the rental numbers.' });
-  if (rent <= 0) flags.push({ level: 'bad', text: 'Enter a monthly rent.' });
+  if (arv <= 0) flags.push({ level: 'bad', text: 'Add the value after repairs to see rental numbers.' });
+  if (rent <= 0) flags.push({ level: 'bad', text: 'Add the monthly rent.' });
   if (arv > 0 && rent > 0 && cashFlowAfterRefi < 0) {
-    flags.push({ level: 'warn', text: `After refinancing, the rent falls about ${money(-cashFlowAfterRefi)} a month short of the costs and loan payment.` });
+    flags.push({ level: 'warn', text: `After refinancing, rent falls about ${money(-cashFlowAfterRefi)} a month short of the costs and loan.` });
   }
   if (allIn > 0 && rent / allIn < 0.01) {
-    flags.push({ level: 'info', text: `Rent is ${(Math.round((rent / allIn) * 1000) / 10)}% of the all-in cost. Many rental buyers look for 1% or more.` });
+    flags.push({ level: 'info', text: `Monthly rent is ${(Math.round((rent / allIn) * 1000) / 10)}% of the total cost. Rental investors usually want 1% or more.` });
   }
   if (cashLeftIn <= 0 && arv > 0) {
-    flags.push({ level: 'info', text: 'The refinance would return all of the buyer\'s cash. Lenders may cap a cash-out refinance at what was spent; check with one.' });
+    flags.push({ level: 'info', text: "The refinance could pay back all of the investor's cash. Some lenders limit this, so check with one." });
   }
 
   const rentalVerdict = flags.some((f) => f.level === 'bad')
