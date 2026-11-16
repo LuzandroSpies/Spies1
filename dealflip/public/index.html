@@ -240,7 +240,12 @@
         <legend>What they do with houses</legend>
         <label><input type="checkbox" name="strategies" value="flip" checked> Fix and sell</label>
         <label><input type="checkbox" name="strategies" value="rental"> Keep as rentals</label>
+        <label><input type="checkbox" name="strategies" value="creative"> Creative terms (subject-to, seller finance)</label>
       </fieldset>
+      <div class="two">
+        <label>Most cash they'll bring to close<input name="maxEntryFee" id="inv-maxEntryFee" type="number" min="0" step="1000" placeholder="For creative deals"></label>
+        <label>Least monthly cash flow they need<input name="minCashFlow" id="inv-minCashFlow" type="number" min="0" step="50" placeholder="For creative deals"></label>
+      </div>
       <label class="check-line"><input type="checkbox" name="proofOfFunds" id="inv-pof"> They've shown proof they have the cash</label>
       <label>Notes<input name="notes" id="inv-notes"></label>
       <input type="hidden" name="propertyTypes" value="single-family, duplex">
@@ -250,6 +255,27 @@
         <button class="secondary" data-close type="button">Cancel</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="guide-dialog" class="sheet" aria-labelledby="guide-title">
+    <div class="sheet-head">
+      <h2 id="guide-title">How creative deals work</h2>
+      <button class="icon-btn" data-close type="button" aria-label="Close">×</button>
+    </div>
+    <div class="guide">
+      <p>Some sellers can't sell for cash: they owe too much, or they'd rather get paid over time. Creative investors buy those houses on <b>terms</b> instead of with a big cash price.</p>
+      <h3>The three main ways</h3>
+      <p><b>Subject-to.</b> The investor takes over the seller's monthly mortgage payment. The loan stays in the seller's name; the house goes in the investor's name. Investors love a low old interest rate, like 3%.</p>
+      <p><b>Seller finance.</b> The seller acts like the bank: the investor pays the seller each month instead of paying cash up front. Best for paid-off houses.</p>
+      <p><b>Both (hybrid).</b> Take over the existing loan, and the seller carries a second loan for their equity.</p>
+      <h3>What investors look at</h3>
+      <p><b>Entry fee:</b> all the cash they bring to close: cash to the seller, any missed payments, closing costs, and your fee.<br><b>Cash flow:</b> rent minus the payments and running costs, each month.<br><b>Equity:</b> what the house is worth minus everything owed.</p>
+      <h3>How you get paid</h3>
+      <p>Same as before: you sign the seller up on creative terms, then assign the contract to a creative investor. Your fee is part of their entry fee and is paid at closing.</p>
+      <h3>Protect the seller (and yourself)</h3>
+      <p>The loan stays in the seller's name, so if the investor stops paying, the seller's credit suffers. The lender's <b>due-on-sale clause</b> also lets it demand the whole balance after a sale. Legitimate operators put every risk in writing for the seller to initial, use a <b>loan servicing company</b> so the seller can see every payment, close with a title company that knows creative deals, and never rush a seller who is behind on payments. Several states have strict rules for buying from owners in foreclosure. Have a local attorney check your documents.</p>
+    </div>
+    <div class="sheet-actions"><button data-close type="button">Got it</button></div>
   </dialog>
 
   <script src="app.js"></script>

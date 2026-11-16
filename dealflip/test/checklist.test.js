@@ -10,7 +10,7 @@ test('checklist tracks done items and notes', () => {
   saved = updateItem(saved, { id: 'llc', note: 'Example Holdings LLC, WY' });
   const p = withProgress(saved);
   assert.strictEqual(p.done, 1);
-  assert.strictEqual(p.total, 14);
+  assert.strictEqual(p.total, 15);
   const llc = p.groups[0].items.find((i) => i.id === 'llc');
   assert.deepStrictEqual([llc.done, llc.note], [true, 'Example Holdings LLC, WY']);
   assert.throws(() => updateItem(saved, { id: 'nope', done: true }));

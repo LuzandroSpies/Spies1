@@ -79,3 +79,18 @@ test('rental view flags negative cash flow and estimates rent when missing', () 
   assert.ok(r.cashFlowAfterRefi < 0);
   assert.strictEqual(r.verdict, 'tight');
 });
+
+test('creative matching uses entry fee and cash flow, and separates cash-only buyers', () => {
+  const deal = { state: 'OH', county: 'Lake', propertyType: 'single-family', condition: 'medium', askingPrice: 100000 };
+  const creative = { entryFee: 15000, cashFlow: 300 };
+  const creativeBuyer = { states: ['OH'], counties: ['Lake'], propertyTypes: ['single-family'], rehabLevels: ['medium'], strategies: ['creative'], maxEntryFee: 20000, minCashFlow: 250, proofOfFunds: true };
+  const m = matchBuyer(creativeBuyer, deal, 0, creative);
+  assert.strictEqual(m.score, 100);
+  assert.ok(m.reasons.includes('buys creative deals'));
+  const tooMuch = matchBuyer({ ...creativeBuyer, maxEntryFee: 10000 }, deal, 0, creative);
+  assert.ok(tooMuch.score < m.score && tooMuch.reasons.some((r) => /over their/.test(r)));
+  const cashOnly = matchBuyer({ ...creativeBuyer, strategies: ['flip'] }, deal, 0, creative);
+  assert.ok(cashOnly.reasons.includes('only buys with cash'));
+  const onCash = matchBuyer({ ...creativeBuyer, minPrice: 0, maxPrice: 200000 }, deal, 100000);
+  assert.ok(onCash.reasons.includes('only buys creative deals'));
+});

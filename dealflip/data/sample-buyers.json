@@ -1,6 +1,126 @@
 [
-  { "id": "b1", "name": "Sample Buyer: Lakeside Rehab LLC", "contact": "lakeside@example.com", "states": ["OH"], "counties": ["Lake", "Geauga"], "minPrice": 5000, "maxPrice": 60000, "propertyTypes": ["single-family", "duplex"], "rehabLevels": ["medium", "heavy"], "proofOfFunds": true, "notes": "Closes in 10 days, cash." },
-  { "id": "b2", "name": "Sample Buyer: Volunteer Homes", "contact": "vh@example.com", "states": ["TN"], "counties": ["Shelby"], "minPrice": 40000, "maxPrice": 140000, "propertyTypes": ["single-family"], "rehabLevels": ["light", "medium"], "proofOfFunds": true, "notes": "Buy-and-hold rentals." },
-  { "id": "b3", "name": "Sample Buyer: Great Lakes Capital", "contact": "glc@example.com", "states": ["MI", "OH"], "counties": ["Wayne"], "minPrice": 2000, "maxPrice": 45000, "propertyTypes": ["single-family"], "rehabLevels": ["heavy"], "proofOfFunds": false, "notes": "Says cash, no POF yet." },
-  { "id": "b4", "name": "Sample Buyer: Sunshine Flips", "contact": "sf@example.com", "states": ["FL"], "counties": ["Polk", "Hillsborough"], "minPrice": 10000, "maxPrice": 90000, "propertyTypes": ["single-family"], "rehabLevels": ["medium", "heavy"], "proofOfFunds": true, "notes": "" }
+  {
+    "id": "b1",
+    "name": "Sample Buyer: Lakeside Rehab LLC",
+    "contact": "lakeside@example.com",
+    "states": [
+      "OH"
+    ],
+    "counties": [
+      "Lake",
+      "Geauga"
+    ],
+    "minPrice": 5000,
+    "maxPrice": 60000,
+    "propertyTypes": [
+      "single-family",
+      "duplex"
+    ],
+    "rehabLevels": [
+      "medium",
+      "heavy"
+    ],
+    "proofOfFunds": true,
+    "notes": "Closes in 10 days, cash."
+  },
+  {
+    "id": "b2",
+    "name": "Sample Buyer: Volunteer Homes",
+    "contact": "vh@example.com",
+    "states": [
+      "TN"
+    ],
+    "counties": [
+      "Shelby"
+    ],
+    "minPrice": 40000,
+    "maxPrice": 140000,
+    "propertyTypes": [
+      "single-family"
+    ],
+    "rehabLevels": [
+      "light",
+      "medium"
+    ],
+    "proofOfFunds": true,
+    "notes": "Buy-and-hold rentals."
+  },
+  {
+    "id": "b3",
+    "name": "Sample Buyer: Great Lakes Capital",
+    "contact": "glc@example.com",
+    "states": [
+      "MI",
+      "OH"
+    ],
+    "counties": [
+      "Wayne"
+    ],
+    "minPrice": 2000,
+    "maxPrice": 45000,
+    "propertyTypes": [
+      "single-family"
+    ],
+    "rehabLevels": [
+      "heavy"
+    ],
+    "proofOfFunds": false,
+    "notes": "Says cash, no POF yet."
+  },
+  {
+    "id": "b4",
+    "name": "Sample Buyer: Sunshine Flips",
+    "contact": "sf@example.com",
+    "states": [
+      "FL"
+    ],
+    "counties": [
+      "Polk",
+      "Hillsborough"
+    ],
+    "minPrice": 10000,
+    "maxPrice": 90000,
+    "propertyTypes": [
+      "single-family"
+    ],
+    "rehabLevels": [
+      "medium",
+      "heavy"
+    ],
+    "proofOfFunds": true,
+    "notes": ""
+  },
+  {
+    "id": "b5",
+    "name": "Sample Buyer: Keystone Terms Group",
+    "contact": "terms@example.com",
+    "states": [
+      "OH",
+      "TN",
+      "FL"
+    ],
+    "counties": [
+      "Lake",
+      "Shelby",
+      "Polk"
+    ],
+    "minPrice": 0,
+    "maxPrice": 400000,
+    "propertyTypes": [
+      "single-family",
+      "duplex"
+    ],
+    "rehabLevels": [
+      "light",
+      "medium"
+    ],
+    "strategies": [
+      "creative",
+      "rental"
+    ],
+    "maxEntryFee": 25000,
+    "minCashFlow": 250,
+    "proofOfFunds": true,
+    "notes": "Subject-to and seller finance only. Wants low-rate loans."
+  }
 ]

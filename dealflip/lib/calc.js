@@ -120,7 +120,8 @@ function money(n) {
 }
 
 // Score how well a cash buyer fits a deal (0-100). Pure data match, no AI.
-function matchBuyer(buyer, deal, askPrice) {
+// `creative` is a creativeAnalysis result when the deal is offered on creative terms.
+function matchBuyer(buyer, deal, askPrice, creative = null) {
   let score = 0;
   const reasons = [];
 
@@ -134,10 +135,44 @@ function matchBuyer(buyer, deal, askPrice) {
     reasons.push(`buys in ${deal.state}`);
   }
 
-  const price = num(askPrice, deal.askingPrice);
-  if (price >= num(buyer.minPrice) && price <= num(buyer.maxPrice, Infinity)) {
-    score += 30;
-    reasons.push('price is in their range');
+  const strategies = buyer.strategies || [];
+  if (creative) {
+    // Creative buyers care about the cash they bring and the monthly cash flow, not the price.
+    if (strategies.includes('creative')) {
+      score += 10;
+      reasons.push('buys creative deals');
+    } else if (strategies.length) {
+      score -= 30;
+      reasons.push('only buys with cash');
+    } else {
+      reasons.push("hasn't said if they buy creative");
+    }
+    if (buyer.maxEntryFee) {
+      if (creative.entryFee <= num(buyer.maxEntryFee)) {
+        score += 10;
+        reasons.push(`entry fee fits (up to ${money(buyer.maxEntryFee)})`);
+      } else {
+        reasons.push(`entry fee over their ${money(buyer.maxEntryFee)} limit`);
+      }
+    }
+    if (buyer.minCashFlow) {
+      if (creative.cashFlow >= num(buyer.minCashFlow)) {
+        score += 10;
+        reasons.push(`cash flow meets their ${money(buyer.minCashFlow)}/mo`);
+      } else {
+        reasons.push(`cash flow under their ${money(buyer.minCashFlow)}/mo`);
+      }
+    }
+  } else {
+    const price = num(askPrice, deal.askingPrice);
+    if (price >= num(buyer.minPrice) && price <= num(buyer.maxPrice, Infinity)) {
+      score += 30;
+      reasons.push('price is in their range');
+    }
+    if (strategies.length === 1 && strategies[0] === 'creative') {
+      score -= 30;
+      reasons.push('only buys creative deals');
+    }
   }
 
   if (buyer.propertyTypes?.includes(deal.propertyType)) {
@@ -155,6 +190,8 @@ function matchBuyer(buyer, deal, askPrice) {
     reasons.push('no proof of funds on file');
   }
 
+  // An investor who hasn't said they buy creatively is at best a partial fit for a creative deal.
+  if (creative && !strategies.includes('creative')) score = Math.min(score, 45);
   return { score: Math.max(0, Math.min(100, score)), reasons };
 }
 

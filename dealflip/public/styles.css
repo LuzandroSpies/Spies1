@@ -386,3 +386,14 @@ section > h2 { margin-bottom: 10px; }
 .saved:empty, #status-extra:empty { display: none; }
 .footnote { text-align: center; }
 .topbar { top: env(safe-area-inset-top, 0px); }
+
+/* creative mode */
+.mode-switch { display: grid; gap: 8px; }
+.segmented { display: inline-flex; background: var(--soft); border-radius: 12px; padding: 4px; gap: 4px; justify-self: start; flex-wrap: wrap; }
+.segmented button { background: none; color: var(--muted); border: 0; border-radius: 9px; min-height: 40px; padding: 8px 16px; }
+.segmented button.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+.group-title { margin: 8px 0 -4px; }
+[data-mode-panel] { display: grid; gap: 16px; }
+.guide { display: grid; gap: 10px; max-height: 62vh; overflow: auto; padding-right: 4px; }
+.guide h3 { margin-top: 6px; }
+.guide p { font-size: 15px; }

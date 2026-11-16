@@ -110,3 +110,39 @@ test('deal emails to rental buyers include rental numbers', async () => {
   const email = await real('POST', '/api/deals/d1/ai/outreach', { buyerId: hold.id, price: 45000 });
   assert.match(email.text, /As a rental: about \$\d/);
 });
+
+test('creative deals: save terms, analyze, match creative buyers, and draft creative documents', async () => {
+  const store = memStore();
+  delete process.env.ANTHROPIC_API_KEY;
+  const handle = createApi({ store, ai: require('../lib/ai') });
+  await assert.rejects(handle('PUT', '/api/deals/d1/creative', { mode: 'barter' }), (e) => e.status === 400);
+  const saved = await handle('PUT', '/api/deals/d1/creative', { mode: 'creative', creative: { loanBalance: 70000, loanRate: 3.25, loanPayment: 650, loanType: 'FHA', lender: 'Example Bank', arrears: 1500, sellerCash: 3000, yourFee: 7000, rent: 1250 } });
+  assert.strictEqual(saved.mode, 'creative');
+  const c = await handle('POST', '/api/deals/d1/creative', {});
+  assert.strictEqual(c.structure, 'subject-to');
+  assert.strictEqual(c.entryFee, 3000 + 1500 + 3000 + 7000);
+  assert.strictEqual(c.inputs.value, 100000); // from the deal
+
+  await handle('POST', '/api/buyers', { name: 'Sub2 Co', states: 'OH', strategies: 'creative', maxEntryFee: 20000, minCashFlow: 200 });
+  await handle('POST', '/api/buyers', { name: 'Cash Co', states: 'OH', strategies: 'flip', minPrice: 0, maxPrice: 200000 });
+  const matches = await handle('POST', '/api/deals/d1/buyers', {});
+  assert.strictEqual(matches[0].buyer.name, 'Sub2 Co');
+  const cashCo = matches.find((m) => m.buyer.name === 'Cash Co');
+  assert.ok(!cashCo || cashCo.reasons.includes('only buys with cash'));
+  const cashMode = await handle('POST', '/api/deals/d1/buyers', { mode: 'cash', price: 50000 });
+  assert.strictEqual(cashMode[0].buyer.name, 'Cash Co');
+
+  const pa = await handle('POST', '/api/deals/d1/contracts/purchase', { terms: { buyerName: 'Me LLC', sellerName: 'Jane Owner' } });
+  assert.match(pa.text, /SUBJECT TO EXISTING FINANCING/);
+  assert.match(pa.text, /Example Bank/);
+  assert.match(pa.text, /due-on-sale/);
+  assert.match(pa.text, /\$1,500 in missed payments/);
+  const [sub2] = (await handle('GET', '/api/buyers')).filter((b) => b.name === 'Sub2 Co');
+  const asg = await handle('POST', '/api/deals/d1/contracts/assignment', { buyerId: sub2.id, terms: { buyerName: 'Me LLC' } });
+  assert.match(asg.text, /entry fee"\) is about \$14,500/);
+  const offer = await handle('POST', '/api/deals/d1/ai/offer', { terms: { buyerName: 'Me LLC' } });
+  assert.match(offer.text, /take over your monthly mortgage payment of about \$650/);
+  const email = await handle('POST', '/api/deals/d1/ai/outreach', { buyerId: sub2.id });
+  assert.match(email.text, /Subject-to deal/);
+  assert.match(email.text, /Entry fee: \$14,500/);
+});

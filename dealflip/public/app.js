@@ -43,7 +43,8 @@ const VERDICT = {
   'does-not-work': { tag: "Doesn't work", cls: 'bad' },
   'needs-value': { tag: 'Needs a value', cls: 'neutral' },
 };
-const verdictOf = (d) => (d.estimatedValue > 0 ? d.quick.verdict : 'needs-value');
+const verdictOf = (d) => (d.mode === 'creative' && d.quickCreative ? d.quickCreative.verdict : d.estimatedValue > 0 ? d.quick.verdict : 'needs-value');
+const feeOf = (d) => (d.mode === 'creative' && d.quickCreative ? d.quickCreative.inputs.yourFee : d.quick.realisticFee);
 
 const state = {
   status: {},
@@ -57,7 +58,12 @@ const state = {
   rental: {},
   analysis: null,
   step: 1,
+  mode: 'cash', // how the investor buys: 'cash' or 'creative' (subject-to / seller finance)
+  creative: {},
+  creativeResult: null,
 };
+
+const STRUCTURE_NAME = { 'subject-to': 'Subject-to', 'seller-finance': 'Seller finance', hybrid: 'Subject-to + seller finance', none: 'Creative' };
 
 // ---------- navigation ----------
 function showView(view) {
@@ -143,7 +149,7 @@ function visibleDeals() {
     .filter((d) => !q || `${d.address} ${d.city} ${d.county} ${d.state}`.toLowerCase().includes(q))
     .filter((d) => !state.source || (d.source || 'Sample') === state.source)
     .filter((d) => (state.filter === 'good' ? verdictOf(d) === 'works' : state.filter === 'tracked' ? d.pipeline?.stage && d.pipeline.stage !== 'lead' : true))
-    .sort((a, b) => rank[verdictOf(a)] - rank[verdictOf(b)] || b.quick.realisticFee - a.quick.realisticFee);
+    .sort((a, b) => rank[verdictOf(a)] - rank[verdictOf(b)] || feeOf(b) - feeOf(a));
 }
 
 const LIST_LIMIT = 150;
@@ -162,13 +168,13 @@ function renderList() {
       const v = verdictOf(d);
       const side =
         v === 'works' || v === 'tight'
-          ? `<span class="dc-fee ${VERDICT[v].cls}">${money(d.quick.realisticFee)}</span><span class="dc-label">${v === 'works' ? 'you could make' : 'tight'}</span>`
+          ? `<span class="dc-fee ${VERDICT[v].cls}">${money(feeOf(d))}</span><span class="dc-label">${v === 'works' ? 'you could make' : 'tight'}</span>`
           : v === 'needs-value'
             ? '<span class="dc-fee neutral">?</span><span class="dc-label">needs a value</span>'
             : '<span class="dc-fee bad">Skip</span><span class="dc-label">doesn\'t work</span>';
       const stage = d.pipeline?.stage && d.pipeline.stage !== 'lead' ? `<span class="pill">${esc(stageLabel(d.pipeline.stage))}</span>` : '';
       return `<li><button class="deal-card ${state.deal?.id === d.id ? 'active' : ''}" data-id="${esc(d.id)}" type="button">
-        <span class="dc-main"><b>${esc(d.address)}</b><span class="muted">${esc([d.city, d.state].filter(Boolean).join(', '))} · ${esc(d.saleType)} · asking ${money(d.askingPrice)}</span>${stage}</span>
+        <span class="dc-main"><b>${esc(d.address)}</b><span class="muted">${esc([d.city, d.state].filter(Boolean).join(', '))} · ${d.mode === 'creative' ? 'Creative' : esc(d.saleType)} · asking ${money(d.askingPrice)}</span>${stage}</span>
         <span class="dc-side">${side}</span>
       </button></li>`;
     })
@@ -197,6 +203,9 @@ async function openDeal(id) {
   state.deal = deal;
   state.step = 1;
   state.rental = {};
+  state.mode = deal.mode || 'cash';
+  state.creative = { yourFee: 5000, ...(deal.creative || {}) };
+  state.creativeResult = null;
   state.inputs = {
     arv: deal.estimatedValue,
     repairs: deal.estimatedRepairs,
@@ -280,6 +289,16 @@ function renderDetail() {
     </nav>
 
     <section class="panel" data-panel-step="1">
+      <div class="mode-switch" role="group" aria-label="How will the investor buy?">
+        <span class="field-label">How will the investor buy?</span>
+        <div class="segmented">
+          <button type="button" data-mode="cash">With cash</button>
+          <button type="button" data-mode="creative">Creative terms</button>
+        </div>
+        <span class="help" id="mode-help"></span>
+      </div>
+      <div data-mode-panel="creative" hidden>${creativeFields(d)}</div>
+      <div data-mode-panel="cash">
       <p class="lead">Check the numbers. Change any of them and the answer above updates.</p>
       <div class="fields">
         ${moneyField('arv', 'Value after repairs', 'What it would sell for once fixed up. Check recent sales of similar houses nearby.')}
@@ -314,6 +333,7 @@ function renderDetail() {
           <p class="muted small">Also assumed: 8% empty months, 8% upkeep, 10% property manager, 5% big repairs, 30-year loan.</p>
         </details>
       </details>
+      </div>
       <div class="panel-actions"><button data-goto="2" type="button">Next: make an offer →</button></div>
     </section>
 
@@ -331,6 +351,7 @@ function renderDetail() {
       <div class="button-row">
         <button id="draft-offer" type="button">Write offer letter</button>
         <button class="secondary" id="draft-purchase" type="button">Purchase agreement</button>
+        <button class="link" data-guide type="button">How creative deals work</button>
       </div>
       <div class="panel-actions"><button class="secondary" data-goto="1" type="button">← Back</button><button data-goto="3" type="button">Next: find an investor →</button></div>
     </section>
@@ -348,6 +369,10 @@ function renderDetail() {
     ${!d.sample ? '<button class="link danger" id="delete-deal" type="button">Delete this deal</button>' : ''}`;
 
   $('#p-stage').value = d.pipeline?.stage || 'lead';
+  $$('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === state.mode));
+  $$('[data-mode-panel]').forEach((p) => (p.hidden = p.dataset.modePanel !== state.mode));
+  $('#mode-help').textContent = state.mode === 'creative' ? "The investor takes over the seller's loan (subject-to), the seller lends to the investor (seller finance), or both." : 'The investor pays cash. Works when the price is low enough.';
+  if (state.mode === 'creative') $('#draft-purchase').textContent = 'Creative purchase agreement';
   renderStatusExtra();
   showStep(state.step);
 }
@@ -369,12 +394,14 @@ $('#detail').addEventListener('click', async (e) => {
     showStep(Number(t.dataset.goto));
     return $('.steps').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+  if (t.dataset.mode) return setMode(t.dataset.mode);
+  if (t.dataset.guide !== undefined) return openDialog($('#guide-dialog'));
   if (t.id === 'use-max') return setInput('buyerPrice', state.analysis.buyerMaxPrice);
   if (t.id === 'second-opinion') return runDoc(t, 'Second opinion', `/api/deals/${id}/ai/review`, { inputs: state.inputs });
-  if (t.id === 'draft-offer') return runDoc(t, 'Offer letter', `/api/deals/${id}/ai/offer`, { terms: termsNow(), inputs: state.inputs });
-  if (t.id === 'draft-purchase') return runDoc(t, 'Purchase agreement', `/api/deals/${id}/contracts/purchase`, { terms: termsNow() });
-  if (t.dataset.email) return runDoc(t, 'Email to investor', `/api/deals/${id}/ai/outreach`, { buyerId: t.dataset.email, price: state.inputs.buyerPrice, inputs: state.inputs, rental: state.rental });
-  if (t.dataset.assign) return runDoc(t, 'Assignment agreement', `/api/deals/${id}/contracts/assignment`, { buyerId: t.dataset.assign, terms: termsNow(), inputs: state.inputs });
+  if (t.id === 'draft-offer') return runDoc(t, 'Offer letter', `/api/deals/${id}/ai/offer`, { terms: termsNow(), inputs: state.inputs, ...modeBody() });
+  if (t.id === 'draft-purchase') return runDoc(t, state.mode === 'creative' ? 'Creative purchase agreement' : 'Purchase agreement', `/api/deals/${id}/contracts/purchase`, { terms: termsNow(), ...modeBody() });
+  if (t.dataset.email) return runDoc(t, 'Email to investor', `/api/deals/${id}/ai/outreach`, { buyerId: t.dataset.email, price: state.inputs.buyerPrice, inputs: state.inputs, rental: state.rental, ...modeBody() });
+  if (t.dataset.assign) return runDoc(t, 'Assignment agreement', `/api/deals/${id}/contracts/assignment`, { buyerId: t.dataset.assign, terms: termsNow(), inputs: state.inputs, ...modeBody() });
   if (t.id === 'comps-btn') return checkComps(t);
   if (t.id === 'use-value') return setInput('arv', state.deal.comps.value.estimate);
   if (t.id === 'go-investors') return showView('investors');
@@ -412,6 +439,12 @@ $('#detail').addEventListener('input', (e) => {
   } else if (t.dataset.term) {
     state.terms[t.dataset.term] = t.type === 'number' ? Number(t.value) || 0 : t.value;
     if (t.dataset.term === 'inspectionDays') renderCancelExplain();
+  } else if (t.dataset.cr) {
+    const k = t.dataset.cr;
+    if (t.value === '') delete state.creative[k];
+    else state.creative[k] = t.tagName === 'SELECT' || t.type === 'text' ? t.value : Number(t.value);
+    debouncedRefresh();
+    saveCreative();
   }
 });
 $('#detail').addEventListener('change', (e) => {
@@ -421,6 +454,116 @@ $('#detail').addEventListener('change', (e) => {
   } else if (e.target.dataset.pipe) saveStatus();
 });
 
+function modeBody() {
+  return { mode: state.mode, creative: state.creative };
+}
+
+function crField(key, label, { help = '', money: isMoney = true, step = 100, placeholder = '' } = {}) {
+  const val = state.creative[key] ?? '';
+  const input = `<input type="number" inputmode="decimal" min="0" step="${step}" data-cr="${key}" id="cr-${key}" value="${esc(val)}" placeholder="${esc(placeholder)}">`;
+  return `<label class="field"><span class="field-label">${label}</span>
+    ${isMoney ? `<span class="money-input"><span aria-hidden="true">$</span>${input}</span>` : input}
+    ${help ? `<span class="help">${help}</span>` : ''}</label>`;
+}
+
+function creativeFields(d) {
+  const c = state.creative;
+  const types = ['Unknown', 'Conventional', 'FHA', 'VA', 'USDA', 'Other'];
+  return `
+    <p class="lead">Fill in what the seller tells you. Ask for a recent mortgage statement to check it.</p>
+    <h3 class="group-title">The seller's loan</h3>
+    <div class="fields">
+      ${crField('loanBalance', 'Amount still owed', { help: 'Leave empty if the house is paid off.' })}
+      ${crField('loanPayment', 'Monthly payment', { help: 'The full payment, including taxes and insurance.' })}
+      ${crField('loanRate', 'Interest rate (%)', { money: false, step: 0.125 })}
+      ${crField('arrears', 'Missed payments owed', { help: 'If the seller is behind. Paid at closing.' })}
+      <label class="field"><span class="field-label">Loan type</span>
+        <select data-cr="loanType" id="cr-loanType">${types.map((t) => `<option ${(c.loanType || 'Unknown') === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label class="field"><span class="field-label">Lender</span><input type="text" data-cr="lender" id="cr-lender" value="${esc(c.lender || '')}" placeholder="e.g. Example Bank"></label>
+    </div>
+    <h3 class="group-title">What the seller gets</h3>
+    <div class="fields">
+      ${crField('sellerCash', 'Cash to the seller at closing', { help: 'Moving money or whatever you agreed.' })}
+    </div>
+    <details class="fold-plain" ${c.noteAmount ? 'open' : ''}>
+      <summary>The seller also carries a loan (seller finance)</summary>
+      <p class="muted small">Use this for a paid-off house, or for the seller's equity on top of the existing loan.</p>
+      <div class="fields">
+        ${crField('noteAmount', 'Amount the seller lends')}
+        ${crField('noteRate', 'Interest rate (%)', { money: false, step: 0.25 })}
+        ${crField('noteYears', 'Paid over (years)', { money: false, step: 1, placeholder: '30' })}
+        ${crField('balloonYears', 'Rest due after (years)', { money: false, step: 1, help: 'A "balloon". Leave empty if none.' })}
+      </div>
+    </details>
+    <h3 class="group-title">The investor's side</h3>
+    <div class="fields">
+      ${crField('rent', 'Monthly rent', { step: 25, placeholder: d.estimatedRent || '' , help: '<span id="cr-rent-help"></span>' })}
+      ${crField('value', 'Value of the house', { placeholder: d.estimatedValue || '' })}
+      ${crField('yourFee', 'Your fee', { help: 'What you charge the investor for the deal.' })}
+      ${crField('closingCosts', 'Closing costs', { placeholder: '3000', help: 'Title company and loan servicing setup.' })}
+    </div>
+    <button class="link" data-guide type="button">How creative deals work</button>`;
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  $$('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+  $$('[data-mode-panel]').forEach((p) => (p.hidden = p.dataset.modePanel !== mode));
+  $('#mode-help').textContent =
+    mode === 'creative'
+      ? 'The investor takes over the seller\'s loan (subject-to), the seller lends to the investor (seller finance), or both.'
+      : 'The investor pays cash. Works when the price is low enough.';
+  const btn = $('#draft-purchase');
+  if (btn) btn.textContent = mode === 'creative' ? 'Creative purchase agreement' : 'Purchase agreement';
+  api(`/api/deals/${encodeURIComponent(state.deal.id)}/creative`, { method: 'PUT', body: { mode } }).then((d) => updateDealInList(d));
+  refresh();
+}
+
+const saveCreative = debounce(async () => {
+  if (!state.deal) return;
+  const d = await api(`/api/deals/${encodeURIComponent(state.deal.id)}/creative`, { method: 'PUT', body: { creative: state.creative } });
+  updateDealInList(d);
+}, 600);
+
+function updateDealInList(d) {
+  if (!d) return;
+  state.deal = { ...state.deal, mode: d.mode, creative: d.creative };
+  const i = state.deals.findIndex((x) => x.id === d.id);
+  if (i !== -1) state.deals[i] = { ...state.deals[i], mode: d.mode, creative: d.creative, quickCreative: state.creativeResult || state.deals[i].quickCreative };
+  renderList();
+}
+
+function renderCreativeAnswer(c) {
+  const v = c.verdict;
+  const fee = c.inputs.yourFee;
+  const first = c.flags.find((f) => f.level === 'bad') || c.flags.find((f) => f.level === 'warn');
+  const others = c.flags.filter((f) => f !== first);
+  const headline = {
+    works: `Creative investors would likely buy this. You could make ${money(fee)}`,
+    tight: `It could work, but it's tight. You'd make ${money(fee)}`,
+    'does-not-work': "This doesn't work on these terms yet",
+  }[v];
+  const ready = c.structure !== 'none' && c.inputs.rent > 0;
+  const help = $('#cr-rent-help');
+  if (help) help.textContent = state.creative.rent ? '' : `Using ${money(c.inputs.rent)}, a rough guess. Type the real rent.`;
+  $('#answer').innerHTML = `
+    <span class="tag ${VERDICT[v].cls}">${VERDICT[v].tag}</span> <span class="tag neutral">${esc(STRUCTURE_NAME[c.structure])}</span>
+    <h2 class="headline">${headline}</h2>
+    ${ready ? `<div class="flow">
+      <div class="flow-step"><span class="flow-label">Investor brings</span><span class="flow-value">${money(c.entryFee)}</span></div>
+      <span class="flow-arrow" aria-hidden="true">→</span>
+      <div class="flow-step"><span class="flow-label">Pays each month</span><span class="flow-value">${money(c.totalPayment)}</span></div>
+      <span class="flow-arrow" aria-hidden="true">→</span>
+      <div class="flow-step"><span class="flow-label">Rents it for</span><span class="flow-value">${money(c.inputs.rent)}</span></div>
+      <span class="flow-arrow" aria-hidden="true">→</span>
+      <div class="flow-step keep ${c.cashFlow >= 0 ? 'pos' : 'neg'}"><span class="flow-label">Keeps each month</span><span class="flow-value">${money(c.cashFlow)}</span></div>
+    </div>
+    <p class="muted small">Equity: <b>${money(c.equity)}</b>${c.cashOnCash !== null ? ` · Yearly return on their cash: <b>${c.cashOnCash}%</b>` : ''}${c.rateSavings > 0 ? ` · Saves <b>${money(c.rateSavings)}</b>/month vs a new loan` : ''}. Your ${money(fee)} fee is part of what the investor brings.</p>` : ''}
+    ${first ? `<p class="flag ${first.level}">${esc(first.text)}</p>` : ''}
+    ${others.length ? `<details class="fold-plain"><summary>${plural(others.length, 'more note')}</summary>${others.map((f) => `<p class="flag ${f.level}">${esc(f.text)}</p>`).join('')}</details>` : ''}
+    <button class="secondary small-btn" id="second-opinion" type="button">Get a second opinion</button>`;
+}
+
 function termsNow() {
   return { ...state.terms, price: state.inputs.contractPrice, earnestMoney: state.inputs.earnestMoney };
 }
@@ -429,14 +572,18 @@ async function refresh() {
   const d = state.deal;
   if (!d) return;
   const id = encodeURIComponent(d.id);
-  const [a, matches, rental] = await Promise.all([
+  const creative = state.mode === 'creative';
+  const [a, matches, rental, cr] = await Promise.all([
     api(`/api/deals/${id}/analyze`, { method: 'POST', body: state.inputs }),
-    api(`/api/deals/${id}/buyers`, { method: 'POST', body: { price: state.inputs.buyerPrice } }),
+    api(`/api/deals/${id}/buyers`, { method: 'POST', body: { price: state.inputs.buyerPrice, ...modeBody() } }),
     api(`/api/deals/${id}/rental`, { method: 'POST', body: { inputs: state.inputs, rental: state.rental } }),
+    creative ? api(`/api/deals/${id}/creative`, { method: 'POST', body: { creative: state.creative } }) : null,
   ]);
   if (state.deal !== d) return; // switched deals mid-request
   state.analysis = a;
-  renderAnswer(a);
+  state.creativeResult = cr;
+  if (creative) renderCreativeAnswer(cr);
+  else renderAnswer(a);
   renderMatches(matches);
   renderRental(rental);
   renderCancelExplain();
@@ -518,7 +665,10 @@ function renderCancelExplain() {
   const el = $('#cancel-explain');
   if (!el) return;
   const days = state.terms.inspectionDays || 0;
-  el.innerHTML = `For <b>${plural(days, 'day')}</b> after signing, you can cancel for any reason and get your <b>${money(state.inputs.earnestMoney)}</b> deposit back. After that, the most you can lose is the deposit. Use those days to find your investor.`;
+  el.innerHTML = `For <b>${plural(days, 'day')}</b> after signing, you can cancel for any reason and get your <b>${money(state.inputs.earnestMoney)}</b> deposit back. After that, the most you can lose is the deposit. Use those days to find your investor.` +
+    (state.mode === 'creative'
+      ? `<br><br><b>Creative terms:</b> the seller's loan stays in their name, and the lender can demand full payment because the house was sold. The agreement makes the seller initial each of these risks. Never rush a seller, and suggest they get their own advice.`
+      : '');
 }
 
 function renderComps(c) {
@@ -795,7 +945,9 @@ async function loadInvestors() {
             <div><dt>Buys in</dt><dd>${esc([...(b.counties || []), ...(b.states || [])].join(', ') || '—')}</dd></div>
             <div><dt>Price</dt><dd>${money(b.minPrice)} to ${b.maxPrice ? money(b.maxPrice) : 'any'}</dd></div>
             <div><dt>Repairs</dt><dd>${esc((b.rehabLevels || []).join(', ') || '—')}</dd></div>
-            ${b.strategies?.length ? `<div><dt>Does</dt><dd>${esc(b.strategies.map((x) => (x === 'rental' ? 'rentals' : 'flips')).join(', '))}</dd></div>` : ''}
+            ${b.strategies?.length ? `<div><dt>Does</dt><dd>${esc(b.strategies.map((x) => ({ rental: 'rentals', flip: 'flips', creative: 'creative deals' })[x] || x).join(', '))}</dd></div>` : ''}
+            ${b.maxEntryFee ? `<div><dt>Brings</dt><dd>up to ${money(b.maxEntryFee)}</dd></div>` : ''}
+            ${b.minCashFlow ? `<div><dt>Needs</dt><dd>${money(b.minCashFlow)}+/month cash flow</dd></div>` : ''}
           </dl>
           ${b.sample ? '' : `<button class="link danger" data-del="${esc(b.id)}" type="button">Remove</button>`}
         </div>`)
@@ -840,7 +992,8 @@ const SIGNUP_QUESTIONS = `Hi! I'm putting together a list of investors to send o
 2. What price range?
 3. What kind of houses: single-family, duplex, small apartment buildings?
 4. How much repair work will you take on: light, medium or heavy?
-5. Do you fix and sell, keep them as rentals, or both?
+5. Do you fix and sell, keep them as rentals, or buy on creative terms (subject-to, seller finance)?
+   If creative: the most cash you'll bring to close, and the least monthly cash flow you need?
 6. How many days do you need to close, and can you show proof of funds?
 7. Anything you avoid, or a minimum profit you need?`;
 

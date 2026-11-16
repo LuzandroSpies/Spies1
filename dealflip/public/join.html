@@ -81,6 +81,11 @@
         <div class="chips" aria-label="Strategy">
           <label><input type="checkbox" name="strategies" value="flip"> Fix and flip</label>
           <label><input type="checkbox" name="strategies" value="rental"> Buy and hold / BRRRR</label>
+          <label><input type="checkbox" name="strategies" value="creative"> Creative (subject-to, seller finance)</label>
+        </div>
+        <div class="row">
+          <label>Most cash you'll bring to close (creative)<input id="maxEntryFee" name="maxEntryFee" type="number" min="0" step="1000" placeholder="25000"></label>
+          <label>Least monthly cash flow you need (creative)<input id="minCashFlow" name="minCashFlow" type="number" min="0" step="50" placeholder="250"></label>
         </div>
       </fieldset>
 
@@ -115,6 +120,7 @@
         minPrice: fd.get('minPrice'), maxPrice: fd.get('maxPrice'),
         propertyTypes: list('propertyTypes'), rehabLevels: list('rehabLevels'), strategies: list('strategies'),
         closeDays: fd.get('closeDays'), proofOfFunds: fd.has('proofOfFunds'), notes: fd.get('notes'),
+        maxEntryFee: fd.get('maxEntryFee'), minCashFlow: fd.get('minCashFlow'),
       };
       const err = document.getElementById('error');
       const btn = document.getElementById('submit');

@@ -2,7 +2,8 @@
 
 // Every DealFlip API route in one place. The Express server and the in-browser
 // preview both call this, so they can't drift apart.
-const { analyzeDeal, matchBuyer, rentalAnalysis } = require('./calc');
+const { analyzeDeal, matchBuyer, rentalAnalysis, estimateRent } = require('./calc');
+const { creativeAnalysis, cleanCreative } = require('./creative');
 const contracts = require('./contracts');
 const pipeline = require('./pipeline');
 const { importCsv } = require('./importer');
@@ -26,7 +27,7 @@ const DEAL_FIELDS = {
 const BUYER_FIELDS = {
   name: 'string', contact: 'string', states: 'list', counties: 'list', minPrice: 'number',
   maxPrice: 'number', propertyTypes: 'list', rehabLevels: 'list', proofOfFunds: 'boolean', notes: 'string',
-  phone: 'string', strategies: 'list', closeDays: 'number',
+  phone: 'string', strategies: 'list', closeDays: 'number', maxEntryFee: 'number', minCashFlow: 'number',
 };
 
 // Keep only known fields and coerce their types, so stored records stay clean.
@@ -74,15 +75,30 @@ function contractTerms(deal, t = {}) {
 const DEFAULT_GOAL = { amount: 30000, deadline: '2026-11-30' };
 
 function withQuick(d) {
-  return { ...d, quick: analysisFor(d) };
+  const out = { ...d, quick: analysisFor(d) };
+  if (d.mode === 'creative') out.quickCreative = creativeFor(d);
+  return out;
 }
 
 // What investors can send through the public sign-up form.
 const SIGNUP_FIELDS = {
   name: 'string', contact: 'string', phone: 'string', states: 'list', counties: 'list', minPrice: 'number',
   maxPrice: 'number', propertyTypes: 'list', rehabLevels: 'list', strategies: 'list', proofOfFunds: 'boolean',
-  closeDays: 'number', notes: 'string',
+  closeDays: 'number', notes: 'string', maxEntryFee: 'number', minCashFlow: 'number',
 };
+
+// Creative terms: saved ones on the deal, overridden by what the page sends.
+function creativeFor(deal, creative = {}) {
+  const saved = deal.creative || {};
+  const value = deal.estimatedValue || 0;
+  return creativeAnalysis({
+    value,
+    rent: deal.estimatedRent || estimateRent(value),
+    ...saved,
+    ...cleanCreative(creative),
+  });
+}
+const wantsCreative = (deal, body) => (body.mode || deal.mode) === 'creative';
 
 function rentalFor(deal, inputs = {}, rental = {}) {
   const a = analysisFor(deal, inputs);
@@ -202,6 +218,19 @@ function createApi({ store, ai, now = () => new Date(), comps = null, fetchCsv =
       }
       case 'POST deals/:id/analyze':
         return analysisFor(dealOr404(id), body);
+      case 'POST deals/:id/creative':
+        return creativeFor(dealOr404(id), body.creative);
+      // Save how the investor buys (cash or creative) and the seller's loan details.
+      case 'PUT deals/:id/creative': {
+        const deal = dealOr404(id);
+        const patch = {};
+        if (body.mode !== undefined) {
+          if (!['cash', 'creative'].includes(body.mode)) throw new HttpError(400, 'Mode must be cash or creative');
+          patch.mode = body.mode;
+        }
+        if (body.creative !== undefined) patch.creative = { ...(deal.creative || {}), ...cleanCreative(body.creative) };
+        return store.update('deals', id, patch);
+      }
       case 'POST deals/:id/rental':
         return rentalFor(dealOr404(id), body.inputs, body.rental);
       case 'POST deals/:id/comps': {
@@ -220,9 +249,10 @@ function createApi({ store, ai, now = () => new Date(), comps = null, fetchCsv =
       case 'POST deals/:id/buyers': {
         const deal = dealOr404(id);
         const price = Number(body.price) || deal.askingPrice;
+        const creative = wantsCreative(deal, body) ? creativeFor(deal, body.creative) : null;
         return store
           .list('buyers')
-          .map((b) => ({ buyer: b, ...matchBuyer(b, deal, price) }))
+          .map((b) => ({ buyer: b, ...matchBuyer(b, deal, price, creative) }))
           .filter((m) => m.score > 0)
           .sort((x, y) => y.score - x.score);
       }
@@ -232,7 +262,8 @@ function createApi({ store, ai, now = () => new Date(), comps = null, fetchCsv =
       }
       case 'POST deals/:id/ai/offer': {
         const deal = dealOr404(id);
-        return ai.draftOffer(deal, contractTerms(deal, body.terms), analysisFor(deal, body.inputs));
+        const creative = wantsCreative(deal, body) ? creativeFor(deal, body.creative) : null;
+        return ai.draftOffer(deal, contractTerms(deal, body.terms), analysisFor(deal, body.inputs), creative);
       }
       case 'POST deals/:id/ai/outreach': {
         const deal = dealOr404(id);
@@ -240,16 +271,19 @@ function createApi({ store, ai, now = () => new Date(), comps = null, fetchCsv =
         const a = analysisFor(deal, body.inputs);
         const price = Number(body.price) || a.inputs.buyerPrice || a.buyerMaxPrice;
         const rental = buyer.strategies?.includes('rental') ? rentalFor(deal, { ...body.inputs, buyerPrice: price }, body.rental) : null;
-        return ai.draftOutreach(deal, buyer, price, a, rental);
+        const creative = wantsCreative(deal, body) ? creativeFor(deal, body.creative) : null;
+        return ai.draftOutreach(deal, buyer, price, a, creative ? null : rental, creative);
       }
       // Contract drafts are fixed templates filled from the deal, not AI-written.
       case 'POST deals/:id/contracts/purchase': {
         const deal = dealOr404(id);
+        if (wantsCreative(deal, body)) return { text: contracts.creativePurchaseAgreement(deal, contractTerms(deal, body.terms), creativeFor(deal, body.creative)) };
         return { text: contracts.purchaseAgreement(deal, contractTerms(deal, body.terms)) };
       }
       case 'POST deals/:id/contracts/assignment': {
         const deal = dealOr404(id);
         const buyer = buyerOr404(body.buyerId);
+        if (wantsCreative(deal, body)) return { text: contracts.creativeAssignmentAgreement(deal, contractTerms(deal, body.terms), buyer, creativeFor(deal, body.creative)) };
         const a = analysisFor(deal, body.inputs);
         return {
           text: contracts.assignmentAgreement(deal, contractTerms(deal, body.terms), buyer, {

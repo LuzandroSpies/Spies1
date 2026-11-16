@@ -24,6 +24,14 @@ Inspired by "AI house flipping" videos, but built to show the real numbers, not 
 
 The first sample deal uses the numbers from the video ($11,559 price, $74,000 value, $50,000 buyer price). The headline $38,441 fee is correct arithmetic. But once you add $18k of repairs and $3.5k of title costs, a 70%-rule investor would pay about $30,300, and at $50,000 the end buyer loses about $6,400.
 
+## Creative finance
+
+Each deal can be judged two ways: **with cash** (the 70% rule, for low enough prices) or on
+**creative terms** (subject-to, seller finance, or both). Creative mode takes the seller's loan
+details and shows the investor's entry fee, monthly payment, rent and cash flow; investors are
+matched on their entry-fee and cash-flow limits, and all documents switch to creative versions
+with seller disclosures. See [docs/creative-finance.md](docs/creative-finance.md).
+
 ## Run it
 
 ```bash
