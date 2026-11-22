@@ -47,6 +47,7 @@ function safeEqual(a, b) {
 // Simple browser login (HTTP Basic auth). Any username; the password is DEALFLIP_PASSWORD.
 app.use((req, res, next) => {
   if (!PASSWORD) return next();
+  if (safeEqual(req.headers['x-dealflip-password'] || '', PASSWORD)) return next(); // the app's own sign-in
   const [scheme, encoded] = String(req.headers.authorization || '').split(' ');
   if (scheme === 'Basic' && encoded) {
     const pass = Buffer.from(encoded, 'base64').toString('utf8').split(':').slice(1).join(':');

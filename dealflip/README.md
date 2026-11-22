@@ -32,6 +32,20 @@ details and shows the investor's entry fee, monthly payment, rent and cash flow;
 matched on their entry-fee and cash-flow limits, and all documents switch to creative versions
 with seller disclosures. See [docs/creative-finance.md](docs/creative-finance.md).
 
+## Put it online with Netlify
+
+The repo is ready for Netlify (`netlify.toml` at the repo root). The app runs as a Netlify
+Function, data is stored in Netlify Blobs, and saved list links are pulled daily by a
+scheduled function.
+
+1. In Netlify: **Add new site → Import an existing project → GitHub → Spies1**.
+2. Set **Branch to deploy** to `claude/ai-house-flipping-xx1ord` (or `main` once merged).
+   Leave the build settings as they are; `netlify.toml` fills them in.
+3. Before (or right after) the first deploy, open **Site configuration → Environment variables**
+   and add `DEALFLIP_PASSWORD` (your sign-in password). Optional: `RENTCAST_API_KEY`,
+   `ANTHROPIC_API_KEY`. Then **Deploys → Trigger deploy**.
+4. Open the site and sign in. Investors sign up at `https://<your-site>.netlify.app/join`.
+
 ## Run it
 
 ```bash

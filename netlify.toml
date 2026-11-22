@@ -1,0 +1,15 @@
+# Netlify settings for DealFlip (the app lives in the dealflip/ folder).
+[build]
+  base = "dealflip"
+  publish = "public"
+  command = "npm ci --omit=dev || npm install --omit=dev"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# The investor sign-up page at /join
+[[redirects]]
+  from = "/join"
+  to = "/join.html"
+  status = 200

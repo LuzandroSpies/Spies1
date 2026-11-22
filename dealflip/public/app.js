@@ -1,15 +1,53 @@
 'use strict';
 
 // ---- api (the preview build swaps this block for an in-browser version) ----
+const PASSWORD_KEY = 'dealflip-password';
+function savedPassword() {
+  try {
+    return localStorage.getItem(PASSWORD_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
 async function api(path, opts = {}) {
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
     ...opts,
+    headers: { 'Content-Type': 'application/json', 'X-DealFlip-Password': savedPassword() },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    // Ask for the password, then retry the same request once it's entered.
+    await askForPassword(data.error);
+    return api(path, opts);
+  }
   if (!res.ok) throw new Error(data.error || `Something went wrong (${res.status})`);
   return data;
+}
+
+let passwordPrompt = null;
+function askForPassword(message) {
+  if (passwordPrompt) return passwordPrompt;
+  const dlg = document.getElementById('login-dialog');
+  const form = document.getElementById('login-form');
+  document.getElementById('login-error').textContent = savedPassword() ? 'That password didn\'t work. Try again.' : '';
+  passwordPrompt = new Promise((resolve) => {
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      try {
+        localStorage.setItem(PASSWORD_KEY, document.getElementById('login-password').value);
+      } catch {
+        /* private browsing: the password just won't be remembered */
+      }
+      dlg.close();
+      passwordPrompt = null;
+      resolve();
+    };
+  });
+  dlg.oncancel = (e) => e.preventDefault(); // nothing works without signing in
+  dlg.showModal();
+  return passwordPrompt;
 }
 // ---- end api ----
 

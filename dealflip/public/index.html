@@ -341,6 +341,16 @@
     </details>
   </dialog>
 
+  <dialog id="login-dialog" class="sheet" aria-labelledby="login-title">
+    <form id="login-form" class="form">
+      <h2 id="login-title">Sign in to DealFlip</h2>
+      <p class="muted small">Enter your DealFlip password. This device will remember it.</p>
+      <label>Password<input id="login-password" type="password" autocomplete="current-password" required></label>
+      <p class="form-error" id="login-error"></p>
+      <div class="sheet-actions"><button type="submit">Sign in</button></div>
+    </form>
+  </dialog>
+
   <script src="app.js"></script>
 </body>
 </html>
